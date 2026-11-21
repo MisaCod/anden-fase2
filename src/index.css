@@ -1,0 +1,2539 @@
+/* ===== Paleta y tipografía =====
+   Todo sale de un azul petróleo: el texto, el header y los botones.
+   El verde menta es el acento y marca "dónde estás ahora".
+   Los grises tienen un toque verde para que combinen con el petróleo. */
+:root {
+  --fondo: #f2f4f3;
+  --superficie: #ffffff;
+  --tinta: #1d3b3a;
+  --gris: #5f716d;
+  --via: #d3dbd8;
+  --acento: #8ed1b7;
+  --acento-suave: #ddf1e9;
+  --exito: #2e7d5b;
+  --error: #b4536a;
+
+  --fuente: 'Poppins', system-ui, sans-serif;
+
+  font-family: var(--fuente);
+  font-size: 16px;
+  color: var(--tinta);
+  background: var(--fondo);
+  color-scheme: light;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--fondo);
+  line-height: 1.5;
+}
+
+/* El footer siempre queda abajo aunque la página tenga poco contenido */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+ol,
+ul {
+  list-style: none;
+}
+
+::selection {
+  background: var(--acento-suave);
+}
+
+:focus-visible {
+  outline: 3px solid var(--tinta);
+  outline-offset: 3px;
+}
+
+h1,
+h2 {
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: 44px;
+}
+
+h2 {
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+h3 {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.contenedor {
+  flex: 1;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 48px 20px 88px;
+}
+
+.texto-suave {
+  color: var(--gris);
+}
+
+/* ===== Header ===== */
+.header {
+  background: var(--tinta);
+  color: white;
+}
+
+.header :focus-visible {
+  outline-color: var(--acento);
+}
+
+.header-contenido {
+  max-width: 1120px;
+  height: 64px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.logo-punto {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 5px solid var(--acento);
+}
+
+.nav {
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  gap: 28px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* 6px de margen interno para que el contorno del foco de "Inicio" no se corte */
+  padding: 0 6px;
+}
+
+.nav a {
+  display: flex;
+  align-items: center;
+  padding-top: 4px;
+  border-bottom: 4px solid transparent;
+  color: #a9bfb9;
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.nav a:hover {
+  color: white;
+}
+
+/* NavLink agrega la clase "active" al enlace de la página actual */
+.nav a.active {
+  color: white;
+  border-bottom-color: var(--acento);
+}
+
+.usuario {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--acento);
+  color: var(--tinta);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* Nivel con una barrita del XP que llevas en ese nivel */
+.usuario-nivel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.mini-barra {
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.mini-barra span {
+  display: block;
+  height: 100%;
+  background: var(--acento);
+}
+
+/* Texto que solo leen los lectores de pantalla */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ===== Footer ===== */
+.footer {
+  border-top: 1px solid var(--via);
+}
+
+.footer-contenido {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 28px 20px;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--gris);
+  font-size: 15px;
+}
+
+.footer-contenido nav {
+  display: flex;
+  gap: 24px;
+}
+
+.footer-contenido a:hover {
+  color: var(--tinta);
+}
+
+/* ===== Elementos que se repiten ===== */
+.boton {
+  display: inline-block;
+  padding: 12px 22px;
+  border: 2px solid var(--tinta);
+  border-radius: 8px;
+  background: var(--tinta);
+  color: white;
+  font-weight: 500;
+  font-size: 15px;
+  text-align: center;
+}
+
+.boton:hover {
+  background: #2a504e;
+  border-color: #2a504e;
+}
+
+.boton-claro {
+  background: transparent;
+  color: var(--tinta);
+}
+
+.boton-claro:hover {
+  background: var(--acento-suave);
+  border-color: var(--tinta);
+}
+
+/* Un botón con aria-disabled se ve apagado y el mouse lo ignora (al teclado lo frena el código) */
+.boton[aria-disabled='true'] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.botones {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.enlace {
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.enlace:hover {
+  color: var(--gris);
+}
+
+/* La barra toma el color de la línea del curso; si no hay, usa la tinta */
+.barra {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--via);
+  overflow: hidden;
+}
+
+.barra-relleno {
+  height: 100%;
+  background: var(--color-linea, var(--tinta));
+}
+
+/* Las barras crecen con una animación corta, salvo que el sistema pida menos movimiento */
+@media (prefers-reduced-motion: no-preference) {
+  .barra-relleno,
+  .mini-barra span {
+    transition: width 0.6s ease;
+  }
+}
+
+.encabezado {
+  margin-bottom: 36px;
+}
+
+.encabezado h1 {
+  margin-bottom: 8px;
+}
+
+.encabezado p {
+  color: var(--gris);
+  font-size: 19px;
+}
+
+.seccion {
+  margin-top: 80px;
+}
+
+.seccion-titulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+/* ===== Líneas de metro: se usan en Inicio, Aula y Mi progreso ===== */
+.punto {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 4px solid var(--via);
+  background: var(--fondo);
+}
+
+.parada.hecho .punto {
+  border-color: var(--color-linea);
+  background: var(--color-linea);
+}
+
+/* La parada actual va en menta: "estás aquí" */
+.parada.actual .punto {
+  border: 5px solid var(--tinta);
+  background: var(--acento);
+}
+
+.parada-titulo {
+  color: var(--gris);
+  line-height: 1.3;
+}
+
+.parada.hecho .parada-titulo {
+  color: var(--tinta);
+}
+
+.parada.actual .parada-titulo {
+  color: var(--tinta);
+  font-weight: 600;
+}
+
+/* En Inicio y en el temario el título de cada parada es un enlace */
+a.parada-titulo:hover {
+  text-decoration: underline;
+}
+
+/* La lección que está abierta en el aula */
+.parada-titulo[aria-current='step'] {
+  color: var(--tinta);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.parada-detalle {
+  color: var(--gris);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Línea horizontal (Inicio) */
+.ruta-scroll {
+  overflow-x: auto;
+  padding: 8px 0;
+}
+
+.ruta-horizontal {
+  display: flex;
+  min-width: 760px;
+}
+
+.ruta-horizontal .parada {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+/* Tramo de vía que une cada parada con la siguiente */
+.ruta-horizontal .parada:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  width: 100%;
+  height: 6px;
+  background: var(--via);
+}
+
+.ruta-horizontal .parada.hecho::after {
+  background: var(--color-linea);
+}
+
+/* Cada nombre ocupa solo el ancho de su parada, así no choca con el de al lado */
+.ruta-horizontal .parada-titulo {
+  max-width: 100%;
+  padding: 0 6px;
+  font-size: 14px;
+}
+
+/* Línea vertical (temario y habilidades) */
+.ruta-vertical .parada {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-bottom: 22px;
+}
+
+.ruta-vertical .parada:last-child {
+  padding-bottom: 0;
+}
+
+.ruta-vertical .parada:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 9px;
+  width: 6px;
+  height: 100%;
+  background: var(--via);
+}
+
+.ruta-vertical .parada.hecho::after {
+  background: var(--color-linea);
+}
+
+.ruta-vertical .parada-titulo {
+  flex: 1;
+  padding-top: 1px;
+}
+
+/* La única animación: un pulso suave en la parada actual */
+@media (prefers-reduced-motion: no-preference) {
+  .parada.actual .punto {
+    animation: latido 2.4s ease-out infinite;
+  }
+}
+
+@keyframes latido {
+  0% {
+    box-shadow: 0 0 0 0 rgba(142, 209, 183, 0.9);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(142, 209, 183, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(142, 209, 183, 0);
+  }
+}
+
+/* ===== Inicio ===== */
+.hero {
+  max-width: 800px;
+  padding: 16px 0 48px;
+}
+
+.hero-saludo {
+  color: var(--gris);
+  font-size: 18px;
+}
+
+.hero-titulo {
+  margin: 6px 0 16px;
+  font-size: 60px;
+  line-height: 1.05;
+}
+
+.hero-detalle {
+  margin-bottom: 28px;
+  font-size: 18px;
+}
+
+/* ===== Filas de cursos (Inicio y Cursos) ===== */
+.fila-curso {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 180px 130px;
+  align-items: center;
+  gap: 28px;
+  padding: 26px 0;
+  border-bottom: 1px solid var(--via);
+}
+
+.insignia {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-linea);
+  color: white;
+  /* En negrita (700) y a 20px cuenta como texto grande: basta un contraste de 3:1 con el color del curso */
+  font-weight: 700;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fila-curso h3 {
+  font-size: 18px;
+}
+
+.fila-curso p {
+  max-width: 60ch;
+}
+
+.fila-curso .meta {
+  margin-top: 4px;
+  font-size: 15px;
+  color: var(--gris);
+}
+
+.fila-curso-progreso span {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+/* ===== Cursos ===== */
+/* Sin overflow: un contenedor con scroll recorta el contorno del foco.
+   Si los botones no caben, bajan a otra fila */
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  border-bottom: 1px solid var(--via);
+}
+
+.filtro {
+  padding: 10px 0;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 4px solid transparent;
+  background: none;
+  color: var(--gris);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.filtro:hover {
+  color: var(--tinta);
+}
+
+.filtro.activo {
+  color: var(--tinta);
+  border-bottom-color: var(--tinta);
+}
+
+.mensaje-vacio {
+  margin-top: 24px;
+  color: var(--gris);
+}
+
+/* ===== Aula ===== */
+.progreso-curso {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+  margin-top: 16px;
+  font-weight: 600;
+}
+
+.aula {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: 56px;
+}
+
+.reproductor {
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--tinta);
+}
+
+/* La pantalla contiene el video y las capas que se ponen encima */
+.pantalla {
+  position: relative;
+}
+
+.reproductor video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--tinta);
+  cursor: pointer;
+}
+
+.boton-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 76px;
+  height: 76px;
+  padding-left: 5px;
+  border: none;
+  border-radius: 50%;
+  background: var(--acento);
+  color: var(--tinta);
+  font-size: 24px;
+}
+
+/* Capa que tapa el video al terminar la lección */
+.capa {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(29, 59, 58, 0.9);
+  overflow-y: auto;
+}
+
+/* La pregunta va debajo del video, dentro del reproductor: encima no cabe entera
+   (el video mide unos 400 px de alto y una pregunta larga necesita casi 500).
+   Tiene que ir después de .capa: con la misma especificidad gana la que está más abajo */
+.capa-pregunta {
+  position: static;
+  padding: 16px;
+}
+
+.capa-pregunta .cuestionario {
+  width: 100%;
+  max-width: 640px;
+  margin: auto;
+}
+
+/* Fondo sólido para que no se mezcle con el texto del video */
+.capa-final {
+  flex-direction: column;
+  gap: 12px;
+  background: var(--tinta);
+  color: white;
+  text-align: center;
+}
+
+.capa-titulo {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.capa-final .botones {
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.capa-final .boton {
+  border-color: var(--acento);
+  background: var(--acento);
+  color: var(--tinta);
+}
+
+.capa-final .boton-claro {
+  background: transparent;
+  color: white;
+}
+
+.controles {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: white;
+}
+
+.control {
+  border: none;
+  background: none;
+  color: white;
+}
+
+.control:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.control-fullscreen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: white;
+  transition: transform 0.15s, color 0.15s;
+}
+
+.control-fullscreen:hover {
+  color: var(--acento);
+  transform: scale(1.15);
+}
+
+/* Pantalla completa para el reproductor */
+.reproductor:fullscreen,
+.reproductor:-webkit-full-screen,
+.reproductor.en-pantalla-completa {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #000;
+}
+
+.reproductor:fullscreen .pantalla,
+.reproductor:-webkit-full-screen .pantalla,
+.reproductor.en-pantalla-completa .pantalla {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  height: calc(100vh - 68px);
+}
+
+.reproductor:fullscreen video,
+.reproductor:-webkit-full-screen video,
+.reproductor.en-pantalla-completa video {
+  width: 100%;
+  height: 100%;
+  max-height: calc(100vh - 68px);
+  object-fit: contain;
+  aspect-ratio: auto;
+}
+
+.reproductor:fullscreen .controles,
+.reproductor:-webkit-full-screen .controles,
+.reproductor.en-pantalla-completa .controles {
+  background: rgba(29, 59, 58, 0.95);
+  backdrop-filter: blur(8px);
+  padding: 16px 24px;
+}
+
+.reproductor:fullscreen .capa-pregunta,
+.reproductor:-webkit-full-screen .capa-pregunta,
+.reproductor.en-pantalla-completa .capa-pregunta {
+  position: absolute;
+  inset: 0;
+  background: rgba(29, 59, 58, 0.94);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+}
+
+/* Sobre el fondo oscuro del reproductor el foco va en menta, como en el header.
+   La tarjeta blanca de la pregunta se queda con el contorno oscuro */
+.boton-play:focus-visible,
+.controles :focus-visible,
+.capa-final :focus-visible {
+  outline-color: var(--acento);
+}
+
+.linea-tiempo {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* El range es invisible: la línea muestra el contorno mientras el range tiene el foco (con teclado o después de un clic) */
+.linea-tiempo:focus-within {
+  outline: 3px solid var(--acento);
+  outline-offset: 6px;
+}
+
+.linea-tiempo-limite,
+.linea-tiempo-visto {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* Hasta dónde se puede saltar (lo ya visto) */
+.linea-tiempo-limite {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.linea-tiempo-visto {
+  background: var(--acento);
+}
+
+.linea-tiempo input {
+  position: absolute;
+  top: -8px;
+  left: 0;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.linea-tiempo input:disabled {
+  cursor: not-allowed;
+}
+
+/* Las marcas se pintan sobre las barras porque van después en el HTML;
+   el range va al final, así que es el que recibe los clics */
+.marca {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  border: 3px solid var(--tinta);
+  background: white;
+}
+
+.marca.respondida {
+  background: var(--acento);
+}
+
+.tiempo {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.leyenda {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 36px;
+  color: var(--gris);
+  font-size: 15px;
+}
+
+.marca-leyenda {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid var(--tinta);
+  background: white;
+}
+
+.cuestionario {
+  padding: 28px;
+  border-radius: 10px;
+  background: var(--superficie);
+}
+
+.cuestionario h2 {
+  margin: 4px 0 22px;
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.opciones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.opcion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 2px solid var(--via);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tinta);
+  text-align: left;
+}
+
+/* :enabled evita el efecto en las opciones que ya no se pueden elegir */
+.opcion:enabled:hover {
+  border-color: var(--tinta);
+}
+
+.opcion:disabled {
+  cursor: default;
+}
+
+.opcion.seleccionada {
+  border-color: var(--tinta);
+  background: var(--acento-suave);
+}
+
+.opcion.incorrecta {
+  color: var(--gris);
+  text-decoration: line-through;
+}
+
+.opcion.incorrecta .opcion-letra {
+  background: #f6e3e7;
+  color: var(--error);
+}
+
+.opcion.correcta {
+  border-color: var(--exito);
+  background: var(--acento-suave);
+  font-weight: 500;
+}
+
+.opcion.correcta .opcion-letra {
+  background: var(--exito);
+  color: white;
+}
+
+.opcion-letra {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--acento-suave);
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cuestionario-pie {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.resultado {
+  margin-top: 16px;
+  color: var(--error);
+  font-weight: 500;
+}
+
+.resultado.bien {
+  color: var(--exito);
+}
+
+.resultado:empty {
+  margin-top: 0;
+}
+
+.modulo + .modulo {
+  margin-top: 30px;
+}
+
+.modulo h3 {
+  margin-bottom: 14px;
+}
+
+/* ===== Mi progreso ===== */
+.nivel {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 24px 48px;
+  padding-bottom: 36px;
+  border-bottom: 1px solid var(--via);
+}
+
+.nivel-numero {
+  font-weight: 600;
+  font-size: 88px;
+  line-height: 0.85;
+  letter-spacing: -0.03em;
+}
+
+.nivel-numero span {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 16px;
+  letter-spacing: 0;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--gris);
+}
+
+.nivel-barra {
+  flex: 1;
+  min-width: 240px;
+  padding-bottom: 6px;
+}
+
+.nivel-texto {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.estadisticas {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  padding: 32px 0;
+  border-bottom: 1px solid var(--via);
+}
+
+.estadistica strong {
+  display: block;
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.estadistica span {
+  color: var(--gris);
+}
+
+.intro {
+  margin: -8px 0 28px;
+}
+
+.arbol {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+.rama h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  font-size: 18px;
+}
+
+.rama-color {
+  width: 24px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-linea);
+}
+
+/* ===== Logros ===== */
+.logros {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 48px 32px;
+}
+
+.logro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.logro .barra {
+  margin-top: 8px;
+}
+
+.logro-insignia {
+  width: 68px;
+  height: 68px;
+  margin-bottom: 10px;
+  border-radius: 50%;
+  background: var(--tinta);
+  color: var(--acento);
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logro-insignia.chica {
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  font-size: 19px;
+}
+
+.logro.bloqueado .logro-insignia {
+  border: 3px dashed var(--via);
+  background: transparent;
+  color: var(--via);
+}
+
+.logro.bloqueado h3 {
+  color: var(--gris);
+}
+
+.logro-fecha {
+  margin-top: 4px;
+  color: var(--exito);
+  font-weight: 600;
+}
+
+.logros-recientes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 48px;
+}
+
+.logro-mini {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ===== Pantallas pequeñas ===== */
+@media (max-width: 800px) {
+  h1 {
+    font-size: 34px;
+  }
+
+  .hero-titulo {
+    font-size: 40px;
+  }
+
+  .header-contenido {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 0 16px;
+    padding-top: 12px;
+  }
+
+  .nav {
+    order: 3;
+    flex-basis: 100%;
+    height: 48px;
+    /* Menos espacio entre enlaces para que los cinco quepan en un celular */
+    gap: 10px;
+  }
+
+  /* Con 16px entre botones los cuatro filtros caben en una fila */
+  .filtros {
+    gap: 8px 16px;
+  }
+
+  .usuario {
+    margin-left: auto;
+  }
+
+  .fila-curso {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 16px 20px;
+  }
+
+  .fila-curso-progreso,
+  .fila-curso .boton {
+    grid-column: 2;
+  }
+
+  .fila-curso .boton {
+    justify-self: start;
+  }
+
+  .aula,
+  .arbol {
+    grid-template-columns: 1fr;
+  }
+
+  .opciones {
+    grid-template-columns: 1fr;
+  }
+
+  .estadisticas {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* En pantallas chicas el aviso final tampoco cabe sobre el video: va debajo */
+  .capa-final {
+    position: static;
+    padding: 16px;
+  }
+}
+
+
+/* ==========================================================================
+   SISTEMA DE AUTENTICACIÓN, LOGIN Y ADMINISTRACIÓN (FASE 2)
+   ========================================================================== */
+
+/* ===== Pantalla de Login ===== */
+.login-pantalla {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  background: radial-gradient(circle at 50% 20%, #e2ece8 0%, var(--fondo) 70%);
+}
+
+.login-tarjeta {
+  width: 100%;
+  max-width: 440px;
+  background: var(--superficie);
+  border-radius: 16px;
+  border: 1px solid var(--via);
+  padding: 36px 32px;
+  box-shadow: 0 10px 30px rgba(29, 59, 58, 0.08);
+}
+
+.login-encabezado {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.login-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 26px;
+  color: var(--tinta);
+  margin-bottom: 16px;
+}
+
+.login-logo .logo-punto {
+  width: 22px;
+  height: 22px;
+}
+
+.login-encabezado h1 {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.login-encabezado p {
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+/* ===== Formularios y campos comunes ===== */
+.campo-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.campo-etiqueta {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.campo-etiqueta-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.campo-contador {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gris);
+  font-variant-numeric: tabular-nums;
+}
+
+.campo-contador.limite-alcanzado {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.campo-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--via);
+  background: var(--superficie);
+  font: inherit;
+  font-size: 15px;
+  color: var(--tinta);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.campo-input:focus {
+  outline: none;
+  border-color: var(--tinta);
+  box-shadow: 0 0 0 3px rgba(142, 209, 183, 0.45);
+}
+
+.campo-input.con-error {
+  border-color: var(--error);
+  background-color: #fff9fa;
+}
+
+.campo-input.con-error:focus {
+  box-shadow: 0 0 0 3px rgba(180, 83, 106, 0.25);
+}
+
+.campo-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.campo-mensaje-error {
+  font-size: 13px;
+  color: var(--error);
+  font-weight: 500;
+}
+
+.input-con-boton {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-con-boton .campo-input {
+  padding-right: 76px;
+}
+
+.boton-toggle-password {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gris);
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.boton-toggle-password:hover {
+  color: var(--tinta);
+}
+
+.boton-login {
+  width: 100%;
+  margin-top: 8px;
+  padding: 14px;
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+/* Alertas de error y éxito sin emojis */
+.alerta-error {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background-color: #fbebee;
+  border: 1px solid rgba(180, 83, 106, 0.35);
+  color: var(--error);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.alerta-exito {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background-color: #eaf6f0;
+  border: 1px solid rgba(46, 125, 91, 0.35);
+  color: var(--exito);
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+.boton-cerrar-alerta {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  opacity: 0.7;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.boton-cerrar-alerta:hover {
+  opacity: 1;
+}
+
+/* Cuentas Demo */
+.login-cuentas-demo {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--via);
+}
+
+.demo-titulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gris);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.demo-botones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.demo-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1.5px dashed var(--via);
+  background: #f7faf9;
+  text-align: left;
+  font-size: 13px;
+  color: var(--tinta);
+  transition: all 0.2s ease;
+}
+
+.demo-chip:hover {
+  border-color: var(--tinta);
+  background: var(--acento-suave);
+}
+
+.demo-rol {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--gris);
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.demo-rol.rol-admin {
+  color: #c95133;
+}
+
+/* ===== Header extras: logout y badges ===== */
+.header-usuario-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.boton-cerrar-sesion {
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.boton-cerrar-sesion:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: white;
+}
+
+.badge-admin-header {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--acento);
+  color: var(--tinta);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  margin-left: 6px;
+}
+
+.enlace-admin-nav {
+  color: var(--acento) !important;
+  font-weight: 600 !important;
+}
+
+/* ===== Layout de Administración ===== */
+.admin-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--fondo);
+}
+
+.admin-header {
+  background: var(--tinta);
+  color: white;
+  border-bottom: 3px solid var(--acento);
+}
+
+.admin-header-contenido {
+  max-width: 1200px;
+  height: 68px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.admin-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 22px;
+}
+
+.badge-admin {
+  background: var(--acento);
+  color: var(--tinta);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.admin-header-acciones {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.boton-enlace-estudiante {
+  font-size: 14px;
+  color: #c9ded7;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s;
+}
+
+.boton-enlace-estudiante:hover {
+  color: white;
+  border-color: var(--acento);
+}
+
+.admin-perfil {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-admin {
+  background: #e06d53;
+  color: white;
+  font-weight: 700;
+}
+
+.admin-nombre {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-principal {
+  max-width: 1200px;
+  padding-top: 36px;
+}
+
+.admin-encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.admin-resumen-tarjetas {
+  display: flex;
+  gap: 16px;
+}
+
+.tarjeta-resumen {
+  background: var(--superficie);
+  border: 1px solid var(--via);
+  border-radius: 10px;
+  padding: 14px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.resumen-numero {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--tinta);
+  line-height: 1;
+}
+
+.resumen-etiqueta {
+  font-size: 12px;
+  color: var(--gris);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* Tabs de administración */
+.admin-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+  border-bottom: 2px solid var(--via);
+  padding-bottom: 2px;
+}
+
+.admin-tab {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gris);
+  padding: 12px 20px;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.admin-tab:hover {
+  color: var(--tinta);
+}
+
+.admin-tab.activa {
+  color: var(--tinta);
+  border-bottom-color: var(--tinta);
+}
+
+/* Grid del formulario de nuevo curso */
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 32px;
+  margin-bottom: 56px;
+}
+
+.admin-seccion-formulario {
+  background: var(--superficie);
+  border: 1px solid var(--via);
+  border-radius: 14px;
+  padding: 28px;
+}
+
+.formulario-cabecera {
+  margin-bottom: 22px;
+}
+
+.formulario-cabecera h2 {
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+
+.admin-form-fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.campo-extra {
+  margin-top: 8px;
+}
+
+.selector-colores {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.muestra-color {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.muestra-color:hover {
+  transform: scale(1.1);
+}
+
+.muestra-color.seleccionado {
+  box-shadow: 0 0 0 2px var(--superficie), 0 0 0 4px var(--tinta);
+}
+
+.color-custom-picker {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--via);
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+}
+
+.modulo-leccion-box {
+  background: #f8faf9;
+  border: 1px dashed var(--via);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+.modulo-leccion-box h3 {
+  font-size: 15px;
+  margin-bottom: 14px;
+  color: var(--tinta);
+}
+
+.boton-crear-curso {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+}
+
+/* Vista previa de tarjeta */
+.admin-seccion-preview {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-seccion-preview h2 {
+  font-size: 19px;
+  margin-bottom: 4px;
+}
+
+.admin-preview-tarjeta {
+  margin-top: 18px;
+  background: var(--superficie);
+  padding: 22px;
+  border-radius: 12px;
+  border: 1px solid var(--via);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-tarjeta-cuerpo {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.preview-tarjeta-cuerpo .insignia {
+  flex-shrink: 0;
+}
+
+.preview-tarjeta-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-tarjeta-info h3 {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--tinta);
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.preview-tarjeta-info .texto-suave {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--gris);
+  overflow-wrap: break-word;
+}
+
+.preview-tarjeta-info .meta {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--gris);
+}
+
+.preview-tarjeta-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--via);
+}
+
+.preview-tarjeta-pie .fila-curso-progreso {
+  flex: 1;
+  max-width: 170px;
+}
+
+.preview-tarjeta-pie .fila-curso-progreso span {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.preview-tarjeta-pie .boton {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+/* Catálogo del admin - Diseño nativo de Andén sin líneas laterales */
+.admin-seccion-catalogo {
+  margin-top: 40px;
+}
+
+.catalogo-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-buscador {
+  max-width: 320px;
+}
+
+/* Lista de cursos en admin: columnas adaptadas para 3 elementos */
+.admin-seccion-catalogo .fila-curso {
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+}
+
+.admin-acciones-curso {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tag-nuevo {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--acento-suave);
+  color: var(--tinta);
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-left: 8px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ===== Sección de Videos (Funcional) ===== */
+.admin-panel-videos {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.zona-subida-videos {
+  background: var(--superficie);
+  border: 1px solid var(--via);
+  border-radius: 14px;
+  padding: 32px;
+}
+
+.zona-subida-videos h2 {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.dropzone-video {
+  margin: 10px 0 6px;
+  border: 2px dashed var(--via);
+  border-radius: 12px;
+  padding: 36px 20px;
+  text-align: center;
+  background: #fbfcfc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.dropzone-video:hover {
+  border-color: var(--tinta);
+  background: #f4f8f6;
+}
+
+.dropzone-video.arrastrando {
+  border-color: var(--tinta);
+  background: var(--acento-suave);
+  border-style: solid;
+}
+
+.dropzone-video.con-error {
+  border-color: var(--error);
+  background: #fff9fa;
+}
+
+.dropzone-texto-principal {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.video-cargado-resumen {
+  margin-top: 8px;
+  background: #f8faf9;
+  border: 1px solid var(--via);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.video-cargado-detalles {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.video-cargado-detalles strong {
+  font-size: 15px;
+  color: var(--tinta);
+}
+
+.video-cargado-acciones {
+  display: flex;
+  gap: 14px;
+}
+
+.boton-enlace {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta);
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.boton-enlace:hover {
+  color: var(--gris);
+}
+
+.boton-enlace.boton-peligro {
+  color: var(--error);
+}
+
+.admin-video-preview-wrapper {
+  margin-top: 14px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  justify-content: center;
+}
+
+.admin-video-preview-player {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+}
+
+.selector-modo-asignacion {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.modo-opcion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--via);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  background: var(--superficie);
+}
+
+.modo-opcion:hover {
+  border-color: var(--tinta);
+}
+
+.modo-opcion.activo {
+  border-color: var(--tinta);
+  background: var(--acento-suave);
+  font-weight: 600;
+}
+
+.modo-opcion input[type="radio"] {
+  cursor: pointer;
+}
+
+.alerta-exito-acciones {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.alerta-exito-acciones .boton {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+/* Responsividad para móviles y tablets */
+@media (max-width: 900px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-header-contenido {
+    height: auto;
+    padding: 14px 20px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-header-acciones {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .admin-form-fila {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-botones {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==============================================================
+   ESTILOS PARA GESTIÓN DINÁMICA DE CURSOS, MÓDULOS, LECCIONES
+   Y CHECKPOINTS INTERACTIVOS (ANDÉN)
+   ============================================================== */
+
+.admin-panel-cursos {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.formulario-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.formulario-titulo-acciones {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.boton-cancelar-edicion {
+  font-size: 13px;
+  padding: 6px 14px;
+}
+
+.boton-peligro-borde {
+  color: var(--error) !important;
+  border-color: var(--error) !important;
+}
+
+.boton-peligro-borde:hover {
+  background: #fff0f3 !important;
+}
+
+.lista-cursos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.logo-texto {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.tag-archivo-actual {
+  font-size: 12px;
+  color: var(--tinta);
+  background: var(--acento-suave);
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.alerta-exito-texto {
+  flex: 1;
+}
+
+/* Subcabecera de secciones dinámicas */
+.seccion-subcabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--via);
+}
+
+.seccion-subcabecera h3 {
+  font-size: 17px;
+  color: var(--tinta);
+  margin-bottom: 2px;
+}
+
+.boton-agregar-modulo {
+  font-size: 13px;
+  padding: 8px 16px;
+  white-space: nowrap;
+}
+
+/* ===== Constructor de Módulos y Lecciones (+) ===== */
+.bloque-modulos-constructor {
+  margin: 12px 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modulos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modulo-card {
+  background: #fbfcfc;
+  border: 1px solid var(--via);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.2s;
+}
+
+.modulo-card:focus-within {
+  border-color: var(--tinta);
+}
+
+.modulo-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.modulo-badge-numero {
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--tinta);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.modulo-input-box {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.boton-eliminar-item {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--error);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.boton-eliminar-item:hover {
+  background: #fff0f3;
+  border-color: var(--error);
+}
+
+/* Lista de lecciones dentro del módulo */
+.lecciones-lista-modulo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--superficie);
+  border: 1px solid #e2e8e5;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.lecciones-titulo-guia {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gris);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.leccion-fila-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.leccion-indice {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gris);
+  min-width: 22px;
+  text-align: right;
+}
+
+.leccion-input-titulo-box {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.leccion-duracion-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.input-segundos {
+  width: 76px;
+  padding: 8px 10px;
+  font-size: 14px;
+  text-align: right;
+}
+
+.boton-texto-mas {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--tinta);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.boton-texto-mas:hover {
+  background: var(--acento-suave);
+}
+
+.botones-formulario-curso,
+.botones-formulario-video {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.botones-formulario-curso .boton-crear-curso,
+.botones-formulario-video .boton-crear-curso {
+  flex: 1;
+}
+
+/* ===== Constructor de Checkpoints y Preguntas Interactivas ===== */
+.seccion-checkpoints-builder {
+  margin: 20px 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mensaje-vacio-checkpoints {
+  padding: 20px;
+  background: #fbfcfc;
+  border: 1px dashed var(--via);
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.checkpoints-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.checkpoint-card {
+  background: #fbfcfc;
+  border: 1px solid var(--via);
+  border-radius: 10px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: border-color 0.2s;
+}
+
+.checkpoint-card:focus-within {
+  border-color: var(--tinta);
+}
+
+.checkpoint-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--via);
+}
+
+.checkpoint-badge {
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--acento-suave);
+  color: var(--tinta);
+  padding: 5px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.checkpoint-tiempo-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tiempo-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.tiempo-inputs-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gris);
+}
+
+.input-tiempo {
+  width: 58px;
+  padding: 6px 8px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.boton-tiempo-actual {
+  background: var(--acento-suave);
+  border: 1px solid var(--acento);
+  color: var(--tinta);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.boton-tiempo-actual:hover {
+  background: var(--acento);
+}
+
+.tiempo-duracion-max {
+  font-size: 12px;
+  color: var(--gris);
+  font-weight: 500;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.checkpoint-error-tiempo {
+  padding: 8px 12px;
+  background: #fff0f3;
+  border-radius: 6px;
+  border: 1px solid var(--error);
+  display: flex;
+  align-items: center;
+}
+
+.checkpoint-error-tiempo .campo-mensaje-error {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--error);
+}
+
+.texto-centrado-bloque {
+  display: block;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.checkpoint-card-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.opciones-respuestas-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.opcion-respuesta-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.opcion-respuesta-fila input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--tinta);
+  flex-shrink: 0;
+}
+
+.input-opcion-texto {
+  flex: 1;
+}
+
+.boton-quitar-opcion {
+  background: transparent;
+  border: none;
+  color: var(--error);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.boton-quitar-opcion:hover {
+  text-decoration: underline;
+}
+
+/* Responsividad para móviles del panel dinámico */
+@media (max-width: 600px) {
+  .modulo-card-header,
+  .checkpoint-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .checkpoint-tiempo-control {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .leccion-fila-item {
+    gap: 8px;
+  }
+
+  .leccion-duracion-box {
+    margin-left: 32px;
+  }
+
+  .botones-formulario-curso,
+  .botones-formulario-video {
+    flex-direction: column;
+  }
+}
+

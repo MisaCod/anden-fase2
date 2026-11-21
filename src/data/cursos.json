@@ -1,0 +1,1808 @@
+[
+  {
+    "id": 1,
+    "titulo": "Fundamentos de React",
+    "categoria": "Programación",
+    "nivel": "Principiante",
+    "descripcion": "Componentes, props, rutas y estado para construir interfaces modernas.",
+    "color": "#2f6f73",
+    "modulos": [
+      {
+        "id": 1,
+        "titulo": "Primeros pasos",
+        "lecciones": [
+          {
+            "id": 101,
+            "titulo": "¿Qué es React?",
+            "duracion": 45,
+            "video": "/videos/101.mp4",
+            "cuestionarios": [
+              {
+                "id": 1011,
+                "segundo": 20,
+                "pregunta": "¿Qué es React?",
+                "opciones": [
+                  "Un lenguaje de programación",
+                  "Una librería de JavaScript para crear interfaces",
+                  "Una base de datos",
+                  "Un servidor web"
+                ],
+                "correcta": 1,
+                "explicacion": "React es una librería de JavaScript para construir interfaces a partir de componentes."
+              }
+            ]
+          },
+          {
+            "id": 102,
+            "titulo": "Componentes y JSX",
+            "duracion": 60,
+            "video": "/videos/102.mp4",
+            "cuestionarios": [
+              {
+                "id": 1021,
+                "segundo": 20,
+                "pregunta": "¿Qué devuelve un componente de React?",
+                "opciones": [
+                  "Un archivo CSS",
+                  "Elementos JSX",
+                  "Una base de datos",
+                  "Un servidor"
+                ],
+                "correcta": 1,
+                "explicacion": "Un componente es una función que devuelve JSX: lo que se va a ver en pantalla."
+              },
+              {
+                "id": 1022,
+                "segundo": 45,
+                "pregunta": "¿Qué atributo se usa en JSX en lugar de class?",
+                "opciones": [
+                  "className",
+                  "classList",
+                  "style",
+                  "id"
+                ],
+                "correcta": 0,
+                "explicacion": "class es una palabra reservada de JavaScript, por eso JSX usa className."
+              }
+            ]
+          },
+          {
+            "id": 103,
+            "titulo": "Props: pasar datos",
+            "duracion": 55,
+            "video": "/videos/103.mp4",
+            "cuestionarios": [
+              {
+                "id": 1031,
+                "segundo": 18,
+                "pregunta": "¿Para qué sirven las props?",
+                "opciones": [
+                  "Para guardar datos en el servidor",
+                  "Para pasar datos de un componente padre a un hijo",
+                  "Para dar estilos",
+                  "Para crear rutas"
+                ],
+                "correcta": 1,
+                "explicacion": "Las props son los datos que un componente recibe desde el componente que lo usa."
+              },
+              {
+                "id": 1032,
+                "segundo": 40,
+                "pregunta": "¿Un componente puede modificar sus props?",
+                "opciones": [
+                  "Sí, cuando quiera",
+                  "No, las props son de solo lectura",
+                  "Solo si son números",
+                  "Solo dentro de un for"
+                ],
+                "correcta": 1,
+                "explicacion": "Las props son de solo lectura; para datos que cambian se usa el estado."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "titulo": "Navegación",
+        "lecciones": [
+          {
+            "id": 104,
+            "titulo": "React Router",
+            "duracion": 60,
+            "video": "/videos/104.mp4",
+            "cuestionarios": [
+              {
+                "id": 1041,
+                "segundo": 20,
+                "pregunta": "¿Qué componente envuelve toda la app para poder usar rutas?",
+                "opciones": [
+                  "Routes",
+                  "Link",
+                  "BrowserRouter",
+                  "Route"
+                ],
+                "correcta": 2,
+                "explicacion": "BrowserRouter va por fuera de todo y permite que funcionen Routes, Route y Link."
+              },
+              {
+                "id": 1042,
+                "segundo": 45,
+                "pregunta": "¿Qué propiedad de Route indica la URL?",
+                "opciones": [
+                  "to",
+                  "path",
+                  "href",
+                  "url"
+                ],
+                "correcta": 1,
+                "explicacion": "path es la URL de la ruta; to es la propiedad de Link."
+              }
+            ]
+          },
+          {
+            "id": 105,
+            "titulo": "Header y Footer",
+            "duracion": 45,
+            "video": "/videos/105.mp4",
+            "cuestionarios": [
+              {
+                "id": 1051,
+                "segundo": 25,
+                "pregunta": "¿Por qué Header y Footer van fuera de Routes?",
+                "opciones": [
+                  "Para que se vean en todas las páginas",
+                  "Porque no son componentes",
+                  "Porque React lo exige",
+                  "Para que carguen más rápido"
+                ],
+                "correcta": 0,
+                "explicacion": "Lo que está fuera de Routes se muestra siempre, sin importar la URL."
+              }
+            ]
+          },
+          {
+            "id": 106,
+            "titulo": "Rutas y enlaces",
+            "duracion": 50,
+            "video": "/videos/106.mp4",
+            "cuestionarios": [
+              {
+                "id": 1061,
+                "segundo": 18,
+                "pregunta": "¿Qué diferencia a Link de una etiqueta a?",
+                "opciones": [
+                  "Link cambia de página sin recargar",
+                  "Link solo funciona con imágenes",
+                  "No hay diferencia",
+                  "Link abre una pestaña nueva"
+                ],
+                "correcta": 0,
+                "explicacion": "Link cambia la URL y la página sin pedir todo el sitio de nuevo al servidor."
+              },
+              {
+                "id": 1062,
+                "segundo": 38,
+                "pregunta": "¿Qué agrega NavLink que no tiene Link?",
+                "opciones": [
+                  "Una animación",
+                  "La clase active en la página actual",
+                  "Un icono",
+                  "Un formulario"
+                ],
+                "correcta": 1,
+                "explicacion": "NavLink marca con la clase active el enlace de la página en la que estás."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "titulo": "Estado e interacción",
+        "lecciones": [
+          {
+            "id": 107,
+            "titulo": "useState",
+            "duracion": 60,
+            "video": "/videos/107.mp4",
+            "cuestionarios": [
+              {
+                "id": 1071,
+                "segundo": 20,
+                "pregunta": "¿Qué devuelve useState?",
+                "opciones": [
+                  "Solo el valor",
+                  "Un arreglo con el valor y la función para cambiarlo",
+                  "Una promesa",
+                  "Un componente"
+                ],
+                "correcta": 1,
+                "explicacion": "useState devuelve [valor, funcionParaCambiarlo]."
+              },
+              {
+                "id": 1072,
+                "segundo": 45,
+                "pregunta": "¿Qué pasa al llamar a la función que cambia el estado?",
+                "opciones": [
+                  "Nada",
+                  "El componente se vuelve a dibujar con el nuevo valor",
+                  "Se recarga la página",
+                  "Se borra el estado"
+                ],
+                "correcta": 1,
+                "explicacion": "Cambiar el estado hace que React vuelva a dibujar el componente con el valor nuevo."
+              }
+            ]
+          },
+          {
+            "id": 108,
+            "titulo": "Formularios",
+            "duracion": 55,
+            "video": "/videos/108.mp4",
+            "cuestionarios": [
+              {
+                "id": 1081,
+                "segundo": 20,
+                "pregunta": "¿Qué evento se usa para leer lo que escribe el usuario en un input?",
+                "opciones": [
+                  "onClick",
+                  "onChange",
+                  "onLoad",
+                  "onHover"
+                ],
+                "correcta": 1,
+                "explicacion": "onChange se dispara cada vez que cambia el valor del input."
+              },
+              {
+                "id": 1082,
+                "segundo": 40,
+                "pregunta": "¿Para qué sirve event.preventDefault() al enviar un formulario?",
+                "opciones": [
+                  "Para borrar el formulario",
+                  "Para evitar que la página se recargue",
+                  "Para validar el email",
+                  "Para cambiar el color"
+                ],
+                "correcta": 1,
+                "explicacion": "Sin preventDefault el navegador recarga la página al enviar el formulario."
+              }
+            ]
+          },
+          {
+            "id": 109,
+            "titulo": "Proyecto final",
+            "duracion": 70,
+            "video": "/videos/109.mp4",
+            "cuestionarios": [
+              {
+                "id": 1091,
+                "segundo": 20,
+                "pregunta": "¿Dónde conviene guardar los datos simulados del proyecto?",
+                "opciones": [
+                  "Dentro del CSS",
+                  "En archivos JSON separados",
+                  "En el index.html",
+                  "En los comentarios"
+                ],
+                "correcta": 1,
+                "explicacion": "Separar los datos en JSON permite cambiarlos por una API real sin tocar los componentes."
+              },
+              {
+                "id": 1092,
+                "segundo": 40,
+                "pregunta": "¿Qué hace .map() en JSX?",
+                "opciones": [
+                  "Dibuja un mapa",
+                  "Recorre un arreglo y devuelve un elemento por cada dato",
+                  "Ordena el arreglo",
+                  "Borra datos"
+                ],
+                "correcta": 1,
+                "explicacion": ".map() transforma cada dato del arreglo en un elemento de la página."
+              },
+              {
+                "id": 1093,
+                "segundo": 60,
+                "pregunta": "¿Qué necesita cada elemento creado con .map()?",
+                "opciones": [
+                  "Una clase CSS",
+                  "Una prop key única",
+                  "Un id de HTML",
+                  "Un evento onClick"
+                ],
+                "correcta": 1,
+                "explicacion": "key ayuda a React a saber qué elemento cambió entre un dibujo y otro."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "titulo": "PHP desde cero",
+    "categoria": "Programación",
+    "nivel": "Principiante",
+    "descripcion": "Variables, arreglos, formularios, sesiones y conexión a MySQL.",
+    "color": "#6a9c89",
+    "modulos": [
+      {
+        "id": 1,
+        "titulo": "Fundamentos de PHP",
+        "lecciones": [
+          {
+            "id": 201,
+            "titulo": "Variables y echo",
+            "duracion": 62,
+            "video": "/videos/201.mp4",
+            "cuestionarios": [
+              {
+                "id": 2011,
+                "segundo": 14,
+                "pregunta": "¿Qué símbolo va delante del nombre de una variable en PHP?",
+                "opciones": [
+                  "#",
+                  "@",
+                  "$",
+                  "&"
+                ],
+                "correcta": 2,
+                "explicacion": "En PHP toda variable lleva el signo $ delante del nombre, por ejemplo $edad o $nombre."
+              },
+              {
+                "id": 2012,
+                "segundo": 30,
+                "pregunta": "Con $nombre = 'Ana', ¿qué muestra echo 'Hola ' . $nombre;?",
+                "opciones": [
+                  "Hola $nombre",
+                  "Hola Ana",
+                  "Hola . Ana",
+                  "Un error de sintaxis"
+                ],
+                "correcta": 1,
+                "explicacion": "El punto concatena cadenas: une 'Hola ' con el valor guardado en $nombre y muestra Hola Ana."
+              },
+              {
+                "id": 2013,
+                "segundo": 46,
+                "pregunta": "¿Qué tipo de dato tiene $edad después de $edad = 20;?",
+                "opciones": [
+                  "string (texto)",
+                  "bool (booleano)",
+                  "array (arreglo)",
+                  "int (entero)"
+                ],
+                "correcta": 3,
+                "explicacion": "PHP deduce el tipo por el valor asignado: 20 escrito sin comillas es un número entero (int)."
+              }
+            ]
+          },
+          {
+            "id": 202,
+            "titulo": "Arreglos y bucles for",
+            "duracion": 70,
+            "video": "/videos/202.mp4",
+            "cuestionarios": [
+              {
+                "id": 2021,
+                "segundo": 15,
+                "pregunta": "Si $frutas = ['pera', 'uva', 'kiwi'], ¿qué vale $frutas[1]?",
+                "opciones": [
+                  "pera",
+                  "kiwi",
+                  "uva",
+                  "null"
+                ],
+                "correcta": 2,
+                "explicacion": "Los índices empiezan en 0: $frutas[0] es pera y $frutas[1] es el segundo elemento, uva."
+              },
+              {
+                "id": 2022,
+                "segundo": 33,
+                "pregunta": "¿Qué función devuelve cuántos elementos tiene un arreglo?",
+                "opciones": [
+                  "count()",
+                  "length()",
+                  "size()",
+                  "strlen()"
+                ],
+                "correcta": 0,
+                "explicacion": "count() devuelve el número de elementos de un arreglo; strlen() mide la longitud de una cadena."
+              },
+              {
+                "id": 2023,
+                "segundo": 52,
+                "pregunta": "En for ($i = 0; $i < 3; $i++), ¿qué valores toma $i dentro del bucle?",
+                "opciones": [
+                  "1, 2 y 3",
+                  "0, 1 y 2",
+                  "0, 1, 2 y 3",
+                  "Solo 3"
+                ],
+                "correcta": 1,
+                "explicacion": "$i empieza en 0 y el bucle se repite mientras $i < 3, así que recorre 0, 1 y 2."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "titulo": "Formularios con PHP",
+        "lecciones": [
+          {
+            "id": 203,
+            "titulo": "El método POST y $_POST",
+            "duracion": 66,
+            "video": "/videos/203.mp4",
+            "cuestionarios": [
+              {
+                "id": 2031,
+                "segundo": 16,
+                "pregunta": "¿Qué atributo de la etiqueta form define el método de envío?",
+                "opciones": [
+                  "method",
+                  "action",
+                  "name",
+                  "type"
+                ],
+                "correcta": 0,
+                "explicacion": "method indica cómo se envían los datos (get o post) y action indica el archivo que los recibe."
+              },
+              {
+                "id": 2032,
+                "segundo": 34,
+                "pregunta": "Con method='post', ¿cómo se lee en PHP el campo con name='correo'?",
+                "opciones": [
+                  "$_GET['correo']",
+                  "$correo['POST']",
+                  "$_FORM['correo']",
+                  "$_POST['correo']"
+                ],
+                "correcta": 3,
+                "explicacion": "PHP guarda los campos enviados por POST en $_POST, usando el valor del atributo name como clave."
+              },
+              {
+                "id": 2033,
+                "segundo": 50,
+                "pregunta": "¿Por qué se usa POST y no GET para enviar una contraseña?",
+                "opciones": [
+                  "Es más rápido que GET",
+                  "Cifra los datos automáticamente",
+                  "Los datos no se muestran en la URL",
+                  "Es el único método que PHP acepta"
+                ],
+                "correcta": 2,
+                "explicacion": "Con POST los datos viajan en el cuerpo de la petición y no en la URL; para cifrarlos hace falta HTTPS."
+              }
+            ]
+          },
+          {
+            "id": 204,
+            "titulo": "Validar con isset y empty",
+            "duracion": 64,
+            "video": "/videos/204.mp4",
+            "cuestionarios": [
+              {
+                "id": 2041,
+                "segundo": 14,
+                "pregunta": "Si el campo nombre no se envió, ¿qué devuelve isset($_POST['nombre'])?",
+                "opciones": [
+                  "true",
+                  "false",
+                  "null",
+                  "Una cadena vacía"
+                ],
+                "correcta": 1,
+                "explicacion": "isset() devuelve true solo si la variable existe y no es null; si el campo no llegó, devuelve false."
+              },
+              {
+                "id": 2042,
+                "segundo": 31,
+                "pregunta": "Si el usuario deja el campo nombre en blanco, ¿qué devuelve empty($_POST['nombre'])?",
+                "opciones": [
+                  "false",
+                  "null",
+                  "Un error",
+                  "true"
+                ],
+                "correcta": 3,
+                "explicacion": "Un campo de texto en blanco llega como cadena vacía '' y empty() devuelve true para ese valor."
+              },
+              {
+                "id": 2043,
+                "segundo": 48,
+                "pregunta": "¿Qué condición es true solo si el campo nombre se envió y no está vacío?",
+                "opciones": [
+                  "isset($_POST['nombre']) && !empty($_POST['nombre'])",
+                  "isset($_POST['nombre']) && empty($_POST['nombre'])",
+                  "!isset($_POST['nombre'])",
+                  "empty($_POST['nombre'])"
+                ],
+                "correcta": 0,
+                "explicacion": "isset() confirma que el campo existe y !empty() que tiene contenido; con && deben cumplirse las dos."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "titulo": "Sesiones y MySQL",
+        "lecciones": [
+          {
+            "id": 205,
+            "titulo": "Sesiones con $_SESSION",
+            "duracion": 68,
+            "video": "/videos/205.mp4",
+            "cuestionarios": [
+              {
+                "id": 2051,
+                "segundo": 15,
+                "pregunta": "¿Qué función hay que llamar antes de usar $_SESSION?",
+                "opciones": [
+                  "session_open()",
+                  "start_session()",
+                  "session_start()",
+                  "session_init()"
+                ],
+                "correcta": 2,
+                "explicacion": "session_start() crea o reanuda la sesión; sin ella, $_SESSION no se conserva entre páginas."
+              },
+              {
+                "id": 2052,
+                "segundo": 32,
+                "pregunta": "¿En qué parte del archivo se debe llamar a session_start()?",
+                "opciones": [
+                  "Al inicio, antes de imprimir cualquier contenido",
+                  "Al final, después de todo el HTML",
+                  "Después del primer echo de la página",
+                  "Solo en la página de cerrar sesión"
+                ],
+                "correcta": 0,
+                "explicacion": "session_start() envía la cookie de sesión en las cabeceras, que deben salir antes de cualquier contenido."
+              },
+              {
+                "id": 2053,
+                "segundo": 50,
+                "pregunta": "Si $nombre tiene el nombre del usuario, ¿cómo se guarda en la sesión?",
+                "opciones": [
+                  "session('usuario', $nombre);",
+                  "$_POST['usuario'] = $nombre;",
+                  "$usuario = $_SESSION;",
+                  "$_SESSION['usuario'] = $nombre;"
+                ],
+                "correcta": 3,
+                "explicacion": "$_SESSION es un arreglo asociativo: lo guardado en una clave se lee en otras páginas tras session_start()."
+              }
+            ]
+          },
+          {
+            "id": 206,
+            "titulo": "Conectar a MySQL con PDO",
+            "duracion": 74,
+            "video": "/videos/206.mp4",
+            "cuestionarios": [
+              {
+                "id": 2061,
+                "segundo": 15,
+                "pregunta": "¿Qué datos recibe new PDO para conectarse a MySQL?",
+                "opciones": [
+                  "Tabla, columna y valor",
+                  "DSN, usuario y contraseña",
+                  "URL, puerto y cookie",
+                  "Host, sesión y formulario"
+                ],
+                "correcta": 1,
+                "explicacion": "Para conectarse, new PDO necesita el DSN y las credenciales: el usuario y la contraseña de MySQL."
+              },
+              {
+                "id": 2062,
+                "segundo": 33,
+                "pregunta": "En el DSN 'mysql:host=localhost;dbname=tienda', ¿qué indica dbname?",
+                "opciones": [
+                  "El usuario",
+                  "El servidor",
+                  "La base de datos",
+                  "La contraseña"
+                ],
+                "correcta": 2,
+                "explicacion": "En el DSN, host indica el servidor y dbname el nombre de la base de datos a la que se conecta."
+              },
+              {
+                "id": 2063,
+                "segundo": 54,
+                "pregunta": "¿Cómo se maneja un error al conectar con PDO?",
+                "opciones": [
+                  "Con isset() sobre la conexión",
+                  "Con echo después de new PDO",
+                  "No se puede detectar",
+                  "Con try/catch atrapando PDOException"
+                ],
+                "correcta": 3,
+                "explicacion": "Si la conexión falla, new PDO lanza una PDOException, que se atrapa con un bloque try/catch."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "titulo": "Diseño de interfaces",
+    "categoria": "Diseño",
+    "nivel": "Intermedio",
+    "descripcion": "Color, tipografía y espacio para crear pantallas claras y usables.",
+    "color": "#8e6c8a",
+    "modulos": [
+      {
+        "id": 1,
+        "titulo": "Color en la interfaz",
+        "lecciones": [
+          {
+            "id": 301,
+            "titulo": "Paletas y armonía",
+            "duracion": 60,
+            "video": "/videos/301.mp4",
+            "cuestionarios": [
+              {
+                "id": 3011,
+                "segundo": 18,
+                "pregunta": "¿Qué tienen en común los colores de una paleta análoga?",
+                "opciones": [
+                  "Están en lados opuestos del círculo cromático",
+                  "Están uno junto al otro en el círculo cromático",
+                  "Son distintos tonos de gris",
+                  "Tienen siempre la misma luminosidad"
+                ],
+                "correcta": 1,
+                "explicacion": "Una paleta análoga usa colores vecinos del círculo cromático, por eso resulta armónica y serena."
+              },
+              {
+                "id": 3012,
+                "segundo": 38,
+                "pregunta": "En la regla 60-30-10, ¿qué proporción de la interfaz ocupa el color de acento?",
+                "opciones": [
+                  "El 60 %",
+                  "El 30 %",
+                  "El 50 %",
+                  "El 10 %"
+                ],
+                "correcta": 3,
+                "explicacion": "El acento se usa poco, cerca del 10 %, para que destaque en lo importante, como el botón principal."
+              }
+            ]
+          },
+          {
+            "id": 302,
+            "titulo": "Contraste y accesibilidad",
+            "duracion": 72,
+            "video": "/videos/302.mp4",
+            "cuestionarios": [
+              {
+                "id": 3021,
+                "segundo": 16,
+                "pregunta": "¿Qué contraste mínimo exige el nivel AA de WCAG para el texto normal?",
+                "opciones": [
+                  "2:1",
+                  "3:1",
+                  "4.5:1",
+                  "7:1"
+                ],
+                "correcta": 2,
+                "explicacion": "El nivel AA de WCAG pide al menos 4.5:1 entre el texto normal y su fondo para que se lea con facilidad."
+              },
+              {
+                "id": 3022,
+                "segundo": 36,
+                "pregunta": "¿Qué contraste mínimo exige el nivel AA de WCAG para el texto grande, como un título de 24 px?",
+                "opciones": [
+                  "3:1",
+                  "4.5:1",
+                  "7:1",
+                  "21:1"
+                ],
+                "correcta": 0,
+                "explicacion": "El texto grande se distingue con más facilidad, por eso el nivel AA de WCAG lo acepta desde un contraste de 3:1."
+              },
+              {
+                "id": 3023,
+                "segundo": 56,
+                "pregunta": "¿Por qué no conviene señalar un error solo con el color rojo?",
+                "opciones": [
+                  "Porque el rojo no está permitido en la web",
+                  "Porque el color hace que la página cargue más lento",
+                  "Porque los navegadores no muestran bien el rojo",
+                  "Porque hay personas que no distinguen bien ciertos colores"
+                ],
+                "correcta": 3,
+                "explicacion": "Las personas con daltonismo pueden no distinguir el rojo, así que conviene sumar un icono o un mensaje de texto."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "titulo": "Tipografía para pantallas",
+        "lecciones": [
+          {
+            "id": 303,
+            "titulo": "Elegir tipografías",
+            "duracion": 58,
+            "video": "/videos/303.mp4",
+            "cuestionarios": [
+              {
+                "id": 3031,
+                "segundo": 15,
+                "pregunta": "¿Qué diferencia a una tipografía serif de una sans serif?",
+                "opciones": [
+                  "La serif tiene pequeños remates al final de los trazos",
+                  "La serif solo existe en letras mayúsculas",
+                  "La sans serif no tiene versión en negrita",
+                  "La sans serif solo sirve para textos impresos"
+                ],
+                "correcta": 0,
+                "explicacion": "Las serif tienen remates en los extremos de los trazos; las sans serif, como Arial, no los tienen."
+              },
+              {
+                "id": 3032,
+                "segundo": 36,
+                "pregunta": "¿Cuántas familias tipográficas conviene usar en una misma interfaz?",
+                "opciones": [
+                  "Una diferente en cada pantalla",
+                  "Cinco o más, para dar variedad",
+                  "Una o dos, variando pesos y tamaños",
+                  "Una distinta para cada botón"
+                ],
+                "correcta": 2,
+                "explicacion": "Con una o dos familias la interfaz se ve coherente, y la variedad se consigue con pesos y tamaños."
+              }
+            ]
+          },
+          {
+            "id": 304,
+            "titulo": "Jerarquía y tamaños",
+            "duracion": 66,
+            "video": "/videos/304.mp4",
+            "cuestionarios": [
+              {
+                "id": 3041,
+                "segundo": 14,
+                "pregunta": "¿Cuál es el tamaño de texto por defecto en la mayoría de los navegadores?",
+                "opciones": [
+                  "10 px",
+                  "16 px",
+                  "24 px",
+                  "32 px"
+                ],
+                "correcta": 1,
+                "explicacion": "Los navegadores usan 16 px por defecto, una base cómoda para el texto de cuerpo en pantalla."
+              },
+              {
+                "id": 3042,
+                "segundo": 32,
+                "pregunta": "¿Qué ayuda a que un título se lea antes que el párrafo que lo sigue?",
+                "opciones": [
+                  "Usar el mismo tamaño y peso en ambos",
+                  "Poner el título en un gris muy claro",
+                  "Escribir un párrafo más largo",
+                  "Hacerlo más grande y con más peso"
+                ],
+                "correcta": 3,
+                "explicacion": "La jerarquía nace del contraste: un título más grande y con más peso atrae primero la mirada."
+              },
+              {
+                "id": 3043,
+                "segundo": 50,
+                "pregunta": "¿Qué interlineado se recomienda para párrafos largos en pantalla?",
+                "opciones": [
+                  "Alrededor de 1.5 veces el tamaño de la letra",
+                  "Exactamente 1 vez el tamaño de la letra",
+                  "Menos de 1 vez el tamaño de la letra",
+                  "Más de 3 veces el tamaño de la letra"
+                ],
+                "correcta": 0,
+                "explicacion": "Un interlineado cercano a 1.5 (line-height: 1.5 en CSS) deja aire entre líneas y facilita la lectura."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "titulo": "Composición y espacio",
+        "lecciones": [
+          {
+            "id": 305,
+            "titulo": "Espaciado y alineación",
+            "duracion": 64,
+            "video": "/videos/305.mp4",
+            "cuestionarios": [
+              {
+                "id": 3051,
+                "segundo": 14,
+                "pregunta": "En un sistema de espaciado basado en 8 px, ¿qué medida respeta la escala?",
+                "opciones": [
+                  "13 px",
+                  "18 px",
+                  "24 px",
+                  "30 px"
+                ],
+                "correcta": 2,
+                "explicacion": "El valor de 24 px equivale a tres veces 8, y usar múltiplos de 8 da un ritmo de espaciado coherente."
+              },
+              {
+                "id": 3052,
+                "segundo": 32,
+                "pregunta": "Según el principio de proximidad, ¿cómo se perciben los elementos cercanos?",
+                "opciones": [
+                  "Como elementos sin relación",
+                  "Como un grupo relacionado",
+                  "Como el contenido más importante",
+                  "Como enlaces a otras páginas"
+                ],
+                "correcta": 1,
+                "explicacion": "La ley de proximidad de la Gestalt dice que lo que está cerca se percibe como un mismo grupo."
+              },
+              {
+                "id": 3053,
+                "segundo": 50,
+                "pregunta": "¿Por qué el texto largo suele alinearse a la izquierda en español?",
+                "opciones": [
+                  "Porque el texto centrado ocupa más memoria",
+                  "Porque CSS no permite otra alineación",
+                  "Porque así las letras se ven más grandes",
+                  "Porque cada línea empieza en el mismo borde"
+                ],
+                "correcta": 3,
+                "explicacion": "Leemos de izquierda a derecha, y un borde izquierdo fijo ayuda al ojo a encontrar el inicio de cada línea."
+              }
+            ]
+          },
+          {
+            "id": 306,
+            "titulo": "Jerarquía visual y retícula",
+            "duracion": 70,
+            "video": "/videos/306.mp4",
+            "cuestionarios": [
+              {
+                "id": 3061,
+                "segundo": 15,
+                "pregunta": "¿Qué da más peso visual al botón principal de una pantalla?",
+                "opciones": [
+                  "Un relleno de color con alto contraste",
+                  "Un texto más pequeño que el resto",
+                  "Quitarle el fondo y el borde",
+                  "Esconderlo al final de la página"
+                ],
+                "correcta": 0,
+                "explicacion": "Un relleno de color contrastado hace que el botón principal destaque sobre las acciones secundarias."
+              },
+              {
+                "id": 3062,
+                "segundo": 35,
+                "pregunta": "¿Cuántas columnas tiene la retícula más usada en diseño web de escritorio?",
+                "opciones": [
+                  "5 columnas",
+                  "7 columnas",
+                  "12 columnas",
+                  "25 columnas"
+                ],
+                "correcta": 2,
+                "explicacion": "Una retícula de 12 columnas se puede dividir en 2, 3, 4 o 6 grupos iguales, lo que da flexibilidad al maquetar."
+              },
+              {
+                "id": 3063,
+                "segundo": 55,
+                "pregunta": "En una retícula, ¿cómo se llama el espacio entre dos columnas?",
+                "opciones": [
+                  "Interlineado",
+                  "Medianil o gutter",
+                  "Sangría",
+                  "Kerning"
+                ],
+                "correcta": 1,
+                "explicacion": "El medianil (gutter en inglés) separa las columnas para que los contenidos no se peguen entre sí."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "titulo": "Bases de datos SQL",
+    "categoria": "Datos",
+    "nivel": "Principiante",
+    "descripcion": "Tablas, relaciones, llaves foráneas y consultas básicas.",
+    "color": "#5b7db1",
+    "modulos": [
+      {
+        "id": 1,
+        "titulo": "Tablas y tipos de datos",
+        "lecciones": [
+          {
+            "id": 401,
+            "titulo": "Crear una tabla",
+            "duracion": 58,
+            "video": "/videos/401.mp4",
+            "cuestionarios": [
+              {
+                "id": 4011,
+                "segundo": 18,
+                "pregunta": "¿Qué instrucción SQL crea una tabla nueva?",
+                "opciones": [
+                  "INSERT INTO",
+                  "ALTER TABLE",
+                  "CREATE TABLE",
+                  "SELECT * FROM"
+                ],
+                "correcta": 2,
+                "explicacion": "CREATE TABLE define una tabla nueva con su nombre y sus columnas; INSERT INTO solo agrega filas."
+              },
+              {
+                "id": 4012,
+                "segundo": 40,
+                "pregunta": "Dentro de CREATE TABLE, ¿qué se indica para cada columna?",
+                "opciones": [
+                  "Su nombre y su tipo de dato",
+                  "El número de filas que tendrá",
+                  "La consulta que la va a leer",
+                  "La contraseña de la base de datos"
+                ],
+                "correcta": 0,
+                "explicacion": "Cada columna se declara con un nombre y un tipo de dato, por ejemplo nombre VARCHAR(100)."
+              }
+            ]
+          },
+          {
+            "id": 402,
+            "titulo": "Tipos de datos",
+            "duracion": 66,
+            "video": "/videos/402.mp4",
+            "cuestionarios": [
+              {
+                "id": 4021,
+                "segundo": 15,
+                "pregunta": "¿Qué tipo de dato guarda números enteros, como la edad de una persona?",
+                "opciones": [
+                  "VARCHAR(50)",
+                  "DATE",
+                  "BOOLEAN",
+                  "INT"
+                ],
+                "correcta": 3,
+                "explicacion": "INT almacena números enteros, así que sirve para valores como la edad y permite operar con ellos."
+              },
+              {
+                "id": 4022,
+                "segundo": 33,
+                "pregunta": "¿Qué significa el 100 en VARCHAR(100)?",
+                "opciones": [
+                  "Que la columna admite 100 filas",
+                  "El máximo de caracteres del texto",
+                  "Que el valor por defecto es 100",
+                  "La cantidad de decimales permitidos"
+                ],
+                "correcta": 1,
+                "explicacion": "VARCHAR(n) guarda texto de longitud variable de hasta n caracteres; en este caso, hasta 100."
+              },
+              {
+                "id": 4023,
+                "segundo": 52,
+                "pregunta": "¿Qué tipo de dato conviene para un precio como 19.99?",
+                "opciones": [
+                  "INT",
+                  "DATE",
+                  "DECIMAL(10,2)",
+                  "BOOLEAN"
+                ],
+                "correcta": 2,
+                "explicacion": "DECIMAL(10,2) guarda números exactos con dos decimales, ideal para montos de dinero como 19.99."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "titulo": "Relaciones entre tablas",
+        "lecciones": [
+          {
+            "id": 403,
+            "titulo": "Llaves primarias",
+            "duracion": 56,
+            "video": "/videos/403.mp4",
+            "cuestionarios": [
+              {
+                "id": 4031,
+                "segundo": 20,
+                "pregunta": "¿Qué garantiza una llave primaria (PRIMARY KEY)?",
+                "opciones": [
+                  "Que la tabla quede ordenada por nombre",
+                  "Que cada fila se identifique de forma única",
+                  "Que la columna acepte valores repetidos",
+                  "Que la tabla no pase de 100 filas"
+                ],
+                "correcta": 1,
+                "explicacion": "La llave primaria identifica cada fila de forma única, por eso no admite valores repetidos ni nulos."
+              },
+              {
+                "id": 4032,
+                "segundo": 40,
+                "pregunta": "Si id es la llave primaria y ya existe una fila con id = 5, ¿qué pasa al insertar otra con id = 5?",
+                "opciones": [
+                  "Se guardan las dos filas sin problema",
+                  "La nueva fila se guarda con id = 6",
+                  "Se borra la fila que ya existía",
+                  "La base de datos rechaza la nueva fila"
+                ],
+                "correcta": 3,
+                "explicacion": "Una llave primaria no admite valores repetidos, así que la base de datos rechaza la nueva fila con un error."
+              }
+            ]
+          },
+          {
+            "id": 404,
+            "titulo": "Llaves foráneas",
+            "duracion": 70,
+            "video": "/videos/404.mp4",
+            "cuestionarios": [
+              {
+                "id": 4041,
+                "segundo": 16,
+                "pregunta": "¿Qué es una llave foránea (FOREIGN KEY)?",
+                "opciones": [
+                  "Una columna que referencia la llave primaria de otra tabla",
+                  "Una contraseña para entrar a la base de datos",
+                  "Una columna que nunca puede repetirse",
+                  "Un índice que ordena la tabla por fecha"
+                ],
+                "correcta": 0,
+                "explicacion": "Una llave foránea apunta a la llave primaria de otra tabla y así conecta los registros de ambas."
+              },
+              {
+                "id": 4042,
+                "segundo": 36,
+                "pregunta": "Una carrera tiene muchos estudiantes y cada estudiante está en una sola carrera. ¿En qué tabla va la llave foránea?",
+                "opciones": [
+                  "En carreras, como estudiante_id",
+                  "En ambas tablas a la vez",
+                  "En estudiantes, como carrera_id",
+                  "En ninguna, basta con el nombre"
+                ],
+                "correcta": 2,
+                "explicacion": "Una carrera no puede guardar muchos estudiante_id en una sola columna; por eso cada estudiante guarda su carrera_id."
+              },
+              {
+                "id": 4043,
+                "segundo": 56,
+                "pregunta": "¿Qué impide una llave foránea?",
+                "opciones": [
+                  "Guardar textos de más de 100 caracteres",
+                  "Referenciar un registro que no existe en la otra tabla",
+                  "Consultar dos tablas al mismo tiempo",
+                  "Tener más de una columna en la tabla"
+                ],
+                "correcta": 1,
+                "explicacion": "La llave foránea cuida la integridad referencial: no deja guardar un id que no exista en la tabla referenciada."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "titulo": "Consultas básicas",
+        "lecciones": [
+          {
+            "id": 405,
+            "titulo": "SELECT con WHERE",
+            "duracion": 64,
+            "video": "/videos/405.mp4",
+            "cuestionarios": [
+              {
+                "id": 4051,
+                "segundo": 14,
+                "pregunta": "¿Qué hace la consulta SELECT nombre FROM estudiantes?",
+                "opciones": [
+                  "Borra la columna nombre",
+                  "Crea una tabla llamada nombre",
+                  "Muestra solo el primer estudiante",
+                  "Muestra el nombre de todos los estudiantes"
+                ],
+                "correcta": 3,
+                "explicacion": "SELECT elige las columnas a mostrar y FROM indica la tabla; sin WHERE se devuelven todas las filas."
+              },
+              {
+                "id": 4052,
+                "segundo": 32,
+                "pregunta": "¿Para qué sirve la cláusula WHERE?",
+                "opciones": [
+                  "Para ordenar los resultados",
+                  "Para elegir la tabla de origen",
+                  "Para filtrar las filas que cumplen una condición",
+                  "Para cambiar el nombre de una columna"
+                ],
+                "correcta": 2,
+                "explicacion": "WHERE evalúa una condición en cada fila y solo devuelve las filas donde esa condición se cumple."
+              },
+              {
+                "id": 4053,
+                "segundo": 50,
+                "pregunta": "¿Qué consulta devuelve los estudiantes con edad mayor que 20?",
+                "opciones": [
+                  "SELECT * FROM estudiantes WHERE edad > 20",
+                  "SELECT * FROM estudiantes ORDER BY edad",
+                  "SELECT edad > 20 FROM estudiantes",
+                  "SELECT * WHERE edad > 20"
+                ],
+                "correcta": 0,
+                "explicacion": "La condición edad > 20 va en la cláusula WHERE, que se escribe después de FROM y del nombre de la tabla."
+              }
+            ]
+          },
+          {
+            "id": 406,
+            "titulo": "Unir tablas con JOIN",
+            "duracion": 74,
+            "video": "/videos/406.mp4",
+            "cuestionarios": [
+              {
+                "id": 4061,
+                "segundo": 18,
+                "pregunta": "¿Para qué se usa JOIN en una consulta?",
+                "opciones": [
+                  "Para borrar filas repetidas",
+                  "Para combinar filas de dos tablas relacionadas",
+                  "Para crear una tabla nueva",
+                  "Para sumar los valores de una columna"
+                ],
+                "correcta": 1,
+                "explicacion": "JOIN combina filas de dos tablas relacionadas, normalmente comparando la llave foránea de una con la primaria de la otra."
+              },
+              {
+                "id": 4062,
+                "segundo": 38,
+                "pregunta": "La tabla estudiantes tiene una llave foránea hacia carreras. ¿Qué condición va después de ON para unirlas?",
+                "opciones": [
+                  "estudiantes.id = carreras.id",
+                  "estudiantes.nombre = carreras.nombre",
+                  "estudiantes.carrera_id = carreras.id",
+                  "carreras.id > 0"
+                ],
+                "correcta": 2,
+                "explicacion": "ON compara la llave foránea carrera_id con la llave primaria id de carreras, que es lo que relaciona ambas tablas."
+              },
+              {
+                "id": 4063,
+                "segundo": 58,
+                "pregunta": "Con INNER JOIN, ¿qué pasa con un estudiante sin carrera asignada (carrera_id es NULL)?",
+                "opciones": [
+                  "Aparece con la carrera vacía",
+                  "Se le asigna la primera carrera",
+                  "La consulta da un error",
+                  "No aparece en el resultado"
+                ],
+                "correcta": 3,
+                "explicacion": "INNER JOIN solo devuelve filas con coincidencia en ambas tablas, así que ese estudiante queda fuera del resultado."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "titulo": "Python para análisis",
+    "categoria": "Datos",
+    "nivel": "Intermedio",
+    "descripcion": "Listas, diccionarios y primeros pasos en el análisis de datos.",
+    "color": "#c77d8e",
+    "modulos": [
+      {
+        "id": 1,
+        "titulo": "Estructuras de datos",
+        "lecciones": [
+          {
+            "id": 501,
+            "titulo": "Listas en Python",
+            "duracion": 62,
+            "video": "/videos/501.mp4",
+            "cuestionarios": [
+              {
+                "id": 5011,
+                "segundo": 16,
+                "pregunta": "¿Qué índice tiene el primer elemento de una lista en Python?",
+                "opciones": [
+                  "0",
+                  "1",
+                  "Depende del tipo de sus elementos",
+                  "Las listas no usan índices"
+                ],
+                "correcta": 0,
+                "explicacion": "En Python los índices empiezan en 0, por eso el primer elemento es lista[0]."
+              },
+              {
+                "id": 5012,
+                "segundo": 32,
+                "pregunta": "Si datos = [4, 7, 9], ¿qué devuelve datos[-1]?",
+                "opciones": [
+                  "4",
+                  "7",
+                  "Un error de índice",
+                  "9"
+                ],
+                "correcta": 3,
+                "explicacion": "Los índices negativos cuentan desde el final, así que datos[-1] es el último elemento: 9."
+              },
+              {
+                "id": 5013,
+                "segundo": 50,
+                "pregunta": "¿Qué hace notas.append(8) si notas es una lista?",
+                "opciones": [
+                  "Reemplaza el primer valor por 8",
+                  "Ordena la lista y luego agrega 8",
+                  "Agrega 8 al final de la lista",
+                  "Borra todos los 8 de la lista"
+                ],
+                "correcta": 2,
+                "explicacion": "append modifica la lista original y coloca el nuevo elemento al final."
+              }
+            ]
+          },
+          {
+            "id": 502,
+            "titulo": "Diccionarios y claves",
+            "duracion": 55,
+            "video": "/videos/502.mp4",
+            "cuestionarios": [
+              {
+                "id": 5021,
+                "segundo": 18,
+                "pregunta": "Si alumno = {'nombre': 'Ana', 'edad': 20}, ¿cómo se obtiene la edad?",
+                "opciones": [
+                  "alumno[1]",
+                  "alumno['edad']",
+                  "alumno.edad",
+                  "alumno('edad')"
+                ],
+                "correcta": 1,
+                "explicacion": "En un diccionario cada valor se busca por su clave, escrita entre corchetes: alumno['edad']."
+              },
+              {
+                "id": 5022,
+                "segundo": 38,
+                "pregunta": "¿Qué devuelve alumno.get('ciudad') si esa clave no existe?",
+                "opciones": [
+                  "Un KeyError",
+                  "Una cadena vacía",
+                  "0",
+                  "None"
+                ],
+                "correcta": 3,
+                "explicacion": "get devuelve None cuando la clave no existe, en vez de lanzar un KeyError como los corchetes."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "titulo": "Funciones y bucles",
+        "lecciones": [
+          {
+            "id": 503,
+            "titulo": "Definir funciones",
+            "duracion": 66,
+            "video": "/videos/503.mp4",
+            "cuestionarios": [
+              {
+                "id": 5031,
+                "segundo": 15,
+                "pregunta": "¿Qué palabra clave se usa para definir una función en Python?",
+                "opciones": [
+                  "function",
+                  "func",
+                  "def",
+                  "define"
+                ],
+                "correcta": 2,
+                "explicacion": "Una función se define con def, seguido del nombre, los parámetros entre paréntesis y dos puntos."
+              },
+              {
+                "id": 5032,
+                "segundo": 34,
+                "pregunta": "¿Qué devuelve una función que termina sin ninguna instrucción return?",
+                "opciones": [
+                  "None",
+                  "0",
+                  "Un error",
+                  "El último valor calculado"
+                ],
+                "correcta": 0,
+                "explicacion": "Si una función termina sin return, Python devuelve None de forma automática."
+              },
+              {
+                "id": 5033,
+                "segundo": 52,
+                "pregunta": "Con def doble(x): return x * 2, ¿qué devuelve doble(5)?",
+                "opciones": [
+                  "25",
+                  "10",
+                  "55",
+                  "Un error"
+                ],
+                "correcta": 1,
+                "explicacion": "Al llamar doble(5), x toma el valor 5 y la función devuelve 5 * 2, es decir, 10."
+              }
+            ]
+          },
+          {
+            "id": 504,
+            "titulo": "Bucles y comprensiones",
+            "duracion": 70,
+            "video": "/videos/504.mp4",
+            "cuestionarios": [
+              {
+                "id": 5041,
+                "segundo": 16,
+                "pregunta": "¿Qué valores toma i en for i in range(3)?",
+                "opciones": [
+                  "1, 2 y 3",
+                  "0, 1 y 2",
+                  "0, 1, 2 y 3",
+                  "Solo el 3"
+                ],
+                "correcta": 1,
+                "explicacion": "range(3) empieza en 0 y se detiene antes del 3, así que produce 0, 1 y 2."
+              },
+              {
+                "id": 5042,
+                "segundo": 36,
+                "pregunta": "¿Qué resultado da [n * 2 for n in [1, 2, 3]]?",
+                "opciones": [
+                  "[1, 2, 3, 1, 2, 3]",
+                  "[1, 4, 9]",
+                  "12",
+                  "[2, 4, 6]"
+                ],
+                "correcta": 3,
+                "explicacion": "La comprensión aplica n * 2 a cada elemento y guarda los resultados en una lista nueva."
+              },
+              {
+                "id": 5043,
+                "segundo": 56,
+                "pregunta": "¿Qué hace [x for x in datos if x > 0]?",
+                "opciones": [
+                  "Borra los negativos de la lista datos",
+                  "Devuelve True si hay algún positivo",
+                  "Crea una lista nueva con los valores mayores que 0",
+                  "Cuenta cuántos valores positivos hay"
+                ],
+                "correcta": 2,
+                "explicacion": "El if filtra los elementos: solo los que cumplen x > 0 pasan a la lista nueva y datos no cambia."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "titulo": "Análisis de datos",
+        "lecciones": [
+          {
+            "id": 505,
+            "titulo": "Promedios y conteos",
+            "duracion": 64,
+            "video": "/videos/505.mp4",
+            "cuestionarios": [
+              {
+                "id": 5051,
+                "segundo": 14,
+                "pregunta": "¿Cómo se calcula el promedio de la lista notas con Python puro?",
+                "opciones": [
+                  "len(notas) / sum(notas)",
+                  "sum(notas) / len(notas)",
+                  "max(notas) - min(notas)",
+                  "notas.average()"
+                ],
+                "correcta": 1,
+                "explicacion": "El promedio es la suma de los valores dividida entre la cantidad de valores: sum / len."
+              },
+              {
+                "id": 5052,
+                "segundo": 32,
+                "pregunta": "Si colores = ['rojo', 'azul', 'rojo'], ¿qué devuelve colores.count('rojo')?",
+                "opciones": [
+                  "1",
+                  "3",
+                  "2",
+                  "True"
+                ],
+                "correcta": 2,
+                "explicacion": "count devuelve cuántas veces aparece un valor en la lista, y 'rojo' aparece 2 veces."
+              },
+              {
+                "id": 5053,
+                "segundo": 52,
+                "pregunta": "En conteo[c] = conteo.get(c, 0) + 1, ¿para qué sirve el 0?",
+                "opciones": [
+                  "Es el valor por defecto si c aún no es una clave",
+                  "Reinicia el conteo en cada vuelta",
+                  "Indica la posición de c en la lista",
+                  "Evita contar valores repetidos"
+                ],
+                "correcta": 0,
+                "explicacion": "get(c, 0) devuelve 0 si c todavía no está en el diccionario, así su primer conteo queda en 1."
+              }
+            ]
+          },
+          {
+            "id": 506,
+            "titulo": "Leer un archivo CSV",
+            "duracion": 72,
+            "video": "/videos/506.mp4",
+            "cuestionarios": [
+              {
+                "id": 5061,
+                "segundo": 18,
+                "pregunta": "¿Qué módulo de la biblioteca estándar de Python lee archivos CSV?",
+                "opciones": [
+                  "math",
+                  "random",
+                  "json",
+                  "csv"
+                ],
+                "correcta": 3,
+                "explicacion": "El módulo csv viene incluido con Python y separa cada fila del archivo en sus columnas."
+              },
+              {
+                "id": 5062,
+                "segundo": 40,
+                "pregunta": "Con csv.DictReader, ¿en qué forma llega cada fila de datos?",
+                "opciones": [
+                  "Como un diccionario con los encabezados como claves",
+                  "Como un número entero",
+                  "Como una lista de archivos",
+                  "Como una sola cadena con todo el archivo"
+                ],
+                "correcta": 0,
+                "explicacion": "DictReader toma la primera fila como encabezados y entrega cada fila siguiente como un diccionario."
+              },
+              {
+                "id": 5063,
+                "segundo": 58,
+                "pregunta": "Si fila['edad'] vale '21', ¿por qué conviene usar int(fila['edad'])?",
+                "opciones": [
+                  "Para borrar la columna edad",
+                  "Porque csv entrega cada valor como texto",
+                  "No hace falta, ya es un número",
+                  "Porque int ordena las filas"
+                ],
+                "correcta": 1,
+                "explicacion": "Por defecto, el módulo csv lee cada valor como cadena, así que hay que convertirlo con int para poder sumar o promediar."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "titulo": "CSS Flexbox y Grid",
+    "categoria": "Diseño",
+    "nivel": "Principiante",
+    "descripcion": "Organiza cualquier página con Flexbox y Grid sin complicarte.",
+    "color": "#b08968",
+    "modulos": [
+      {
+        "id": 1,
+        "titulo": "Flexbox desde cero",
+        "lecciones": [
+          {
+            "id": 601,
+            "titulo": "Display flex y dirección",
+            "duracion": 64,
+            "video": "/videos/601.mp4",
+            "cuestionarios": [
+              {
+                "id": 6011,
+                "segundo": 14,
+                "pregunta": "¿Dónde se declara display: flex para colocar varias tarjetas en fila?",
+                "opciones": [
+                  "En cada una de las tarjetas",
+                  "En el contenedor que las agrupa",
+                  "En la última tarjeta",
+                  "En la etiqueta head"
+                ],
+                "correcta": 1,
+                "explicacion": "display: flex va en el padre y convierte a sus hijos directos en elementos flexibles."
+              },
+              {
+                "id": 6012,
+                "segundo": 32,
+                "pregunta": "¿Cuál es el valor por defecto de flex-direction?",
+                "opciones": [
+                  "column",
+                  "row-reverse",
+                  "column-reverse",
+                  "row"
+                ],
+                "correcta": 3,
+                "explicacion": "Si no indicas nada, flex-direction vale row y los elementos se colocan en una fila horizontal."
+              },
+              {
+                "id": 6013,
+                "segundo": 50,
+                "pregunta": "En un contenedor flex, ¿qué declaración apila los elementos uno debajo de otro?",
+                "opciones": [
+                  "flex-direction: row",
+                  "flex-direction: row-reverse",
+                  "flex-direction: column",
+                  "display: inline-flex"
+                ],
+                "correcta": 2,
+                "explicacion": "Con column el eje principal pasa a ser vertical y los elementos quedan apilados de arriba abajo."
+              }
+            ]
+          },
+          {
+            "id": 602,
+            "titulo": "Alineación con Flexbox",
+            "duracion": 70,
+            "video": "/videos/602.mp4",
+            "cuestionarios": [
+              {
+                "id": 6021,
+                "segundo": 15,
+                "pregunta": "En un contenedor flex, ¿sobre qué eje reparte justify-content los elementos?",
+                "opciones": [
+                  "El eje principal",
+                  "El eje cruzado",
+                  "Siempre el eje vertical",
+                  "El eje de profundidad"
+                ],
+                "correcta": 0,
+                "explicacion": "justify-content trabaja en el eje principal, que es el que marca flex-direction."
+              },
+              {
+                "id": 6022,
+                "segundo": 35,
+                "pregunta": "¿Qué valor de justify-content pega el primer y el último elemento a los bordes?",
+                "opciones": [
+                  "center",
+                  "flex-start",
+                  "space-around",
+                  "space-between"
+                ],
+                "correcta": 3,
+                "explicacion": "space-between deja el primero al inicio, el último al final y reparte el espacio sobrante entre ellos."
+              },
+              {
+                "id": 6023,
+                "segundo": 56,
+                "pregunta": "¿Qué combinación centra un elemento en ambos ejes dentro de un contenedor flex?",
+                "opciones": [
+                  "justify-content: center y align-items: center",
+                  "text-align: center y margin: 0",
+                  "flex-direction: center y align-items: top",
+                  "float: center y vertical-align: middle"
+                ],
+                "correcta": 0,
+                "explicacion": "justify-content centra en el eje principal y align-items en el cruzado, así queda en el centro exacto."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "titulo": "CSS Grid paso a paso",
+        "lecciones": [
+          {
+            "id": 603,
+            "titulo": "Columnas con Grid",
+            "duracion": 58,
+            "video": "/videos/603.mp4",
+            "cuestionarios": [
+              {
+                "id": 6031,
+                "segundo": 14,
+                "pregunta": "¿Qué crea grid-template-columns: 1fr 1fr 1fr?",
+                "opciones": [
+                  "Tres filas de la misma altura",
+                  "Una sola columna de 3fr",
+                  "Tres columnas del mismo ancho",
+                  "Tres columnas de 1 píxel"
+                ],
+                "correcta": 2,
+                "explicacion": "Cada 1fr recibe una parte igual del espacio libre, así que salen tres columnas del mismo ancho."
+              },
+              {
+                "id": 6032,
+                "segundo": 30,
+                "pregunta": "Con grid-template-columns: 200px 1fr, ¿cómo es la segunda columna?",
+                "opciones": [
+                  "Mide 200px, igual que la primera",
+                  "Ocupa todo el espacio que sobra",
+                  "Mide solo 1 píxel de ancho",
+                  "Pasa a ser una fila nueva"
+                ],
+                "correcta": 1,
+                "explicacion": "La primera columna queda fija en 200px y 1fr se queda con todo el espacio restante del contenedor."
+              },
+              {
+                "id": 6033,
+                "segundo": 47,
+                "pregunta": "¿Qué escritura equivale a 1fr 1fr 1fr 1fr?",
+                "opciones": [
+                  "repeat(1fr, 4)",
+                  "grid(4, 1fr)",
+                  "4 * 1fr",
+                  "repeat(4, 1fr)"
+                ],
+                "correcta": 3,
+                "explicacion": "repeat(4, 1fr) repite cuatro veces la misma columna y ahorra escribir 1fr una y otra vez."
+              }
+            ]
+          },
+          {
+            "id": 604,
+            "titulo": "Gap y áreas con nombre",
+            "duracion": 72,
+            "video": "/videos/604.mp4",
+            "cuestionarios": [
+              {
+                "id": 6041,
+                "segundo": 14,
+                "pregunta": "¿Qué hace gap: 20px en un contenedor grid?",
+                "opciones": [
+                  "Deja 20px entre filas y columnas",
+                  "Añade un borde de 20px alrededor",
+                  "Agranda cada celda 20px",
+                  "Pone 20px de margen exterior"
+                ],
+                "correcta": 0,
+                "explicacion": "gap crea espacio solo entre filas y columnas, nunca en los bordes exteriores del contenedor."
+              },
+              {
+                "id": 6042,
+                "segundo": 34,
+                "pregunta": "¿Qué declaración coloca un elemento en el área llamada cabecera?",
+                "opciones": [
+                  "grid-name: cabecera",
+                  "area: cabecera",
+                  "grid-area: cabecera",
+                  "grid-template: cabecera"
+                ],
+                "correcta": 2,
+                "explicacion": "grid-area: cabecera lleva el elemento a las celdas marcadas como cabecera en grid-template-areas."
+              },
+              {
+                "id": 6043,
+                "segundo": 56,
+                "pregunta": "En grid-template-areas, ¿qué indica un punto (.)?",
+                "opciones": [
+                  "Una celda sin nombre",
+                  "El final de una fila",
+                  "Un área llamada punto",
+                  "Un error de sintaxis"
+                ],
+                "correcta": 0,
+                "explicacion": "El punto marca una celda que no pertenece a ningún área con nombre; sirve para dejar huecos."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "titulo": "Diseño responsive",
+        "lecciones": [
+          {
+            "id": 605,
+            "titulo": "Media queries básicas",
+            "duracion": 60,
+            "video": "/videos/605.mp4",
+            "cuestionarios": [
+              {
+                "id": 6051,
+                "segundo": 14,
+                "pregunta": "¿Cuándo se aplican los estilos de @media (max-width: 600px)?",
+                "opciones": [
+                  "Solo con más de 600px de ancho",
+                  "Con 600px de ancho o menos",
+                  "Solo al imprimir la página",
+                  "Siempre, en cualquier pantalla"
+                ],
+                "correcta": 1,
+                "explicacion": "max-width: 600px se cumple mientras la ventana mida 600px o menos, algo típico en móviles."
+              },
+              {
+                "id": 6052,
+                "segundo": 30,
+                "pregunta": "En un diseño mobile first, ¿qué condición añade los estilos de escritorio?",
+                "opciones": [
+                  "@media (min-width: 900px)",
+                  "@media (max-width: 900px)",
+                  "@media print",
+                  "@media (orientation: portrait)"
+                ],
+                "correcta": 0,
+                "explicacion": "Mobile first parte del diseño para móvil y usa min-width para añadir estilos en pantallas anchas."
+              },
+              {
+                "id": 6053,
+                "segundo": 48,
+                "pregunta": "En móvil, ¿qué declaración pasa un menú flex de fila a columna?",
+                "opciones": [
+                  "align-items: stretch",
+                  "justify-content: column",
+                  "flex-wrap: nowrap",
+                  "flex-direction: column"
+                ],
+                "correcta": 3,
+                "explicacion": "Dentro de la media query basta con cambiar flex-direction a column para apilar los enlaces."
+              }
+            ]
+          },
+          {
+            "id": 606,
+            "titulo": "Auto-fill y minmax",
+            "duracion": 74,
+            "video": "/videos/606.mp4",
+            "cuestionarios": [
+              {
+                "id": 6061,
+                "segundo": 14,
+                "pregunta": "¿Qué indica minmax(200px, 1fr) en una columna?",
+                "opciones": [
+                  "Que mide 200px exactos",
+                  "Mínimo 200px y máximo 1fr",
+                  "Máximo 200px y mínimo 1fr",
+                  "Un margen de 200px entre columnas"
+                ],
+                "correcta": 1,
+                "explicacion": "minmax(mín, máx) fija un rango: la columna nunca baja de 200px y puede crecer hasta 1fr."
+              },
+              {
+                "id": 6062,
+                "segundo": 36,
+                "pregunta": "En grid-template-columns, ¿qué hace repeat(auto-fill, minmax(200px, 1fr))?",
+                "opciones": [
+                  "Crea siempre 200 columnas",
+                  "Crea una sola columna flexible",
+                  "Crea tantas columnas como quepan",
+                  "Oculta los elementos que no caben"
+                ],
+                "correcta": 2,
+                "explicacion": "auto-fill mete tantas columnas de al menos 200px como permita el ancho, sin escribir media queries."
+              },
+              {
+                "id": 6063,
+                "segundo": 58,
+                "pregunta": "Con repeat(auto-fill, minmax(200px, 1fr)), si la ventana se estrecha y ya no caben tantas columnas, ¿qué pasa?",
+                "opciones": [
+                  "Las columnas bajan de 200px",
+                  "Hay menos columnas y los elementos bajan de fila",
+                  "Aparece un scroll horizontal",
+                  "Los elementos se superponen"
+                ],
+                "correcta": 1,
+                "explicacion": "La rejilla quita columnas y los elementos que sobran pasan a la fila siguiente de forma automática."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
