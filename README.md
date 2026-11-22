@@ -1,67 +1,73 @@
-# andén, fase 2: funciona el núcleo
+# andén — Plataforma interactiva de microaprendizaje (React + FastAPI + SQLite)
 
-Segunda fase del Portal de E-Learning. El aula es el corazón del portal: un reproductor propio sobre un `<video>` real se detiene en cada pregunta, no deja seguir sin acertar ni adelantar lo que no se ha visto. El progreso (XP, nivel, segundos vistos y lecciones) es uno solo para toda la app, se ve al instante en todas las páginas y sobrevive a una recarga.
+Proyecto de **Programación Web (URBE 2026)**. Incluye frontend en React + Vite y backend real en Python (**FastAPI + SQLAlchemy + SQLite**) con autenticación por roles, cursos gratis y restringidos, 5 tipos de preguntas interactivas en video, porcentaje de aciertos, certificados verificables, logros y árbol de habilidades dinámicos.
 
 ## Cómo correrlo
 
+### 1. Instalar dependencias (solo la primera vez)
+
 ```bash
+# Frontend
 npm install
+
+# Backend Python
+python -m venv backend/.venv
+backend/.venv/Scripts/pip install -r backend/requirements.txt
+```
+
+### 2. Levantar Backend y Frontend
+
+Opción rápida en Windows PowerShell:
+
+```powershell
+.\iniciar.ps1
+```
+
+O en dos terminales separadas:
+
+```bash
+# Terminal 1 — Backend FastAPI + SQLite (puerto 8000)
+cd backend
+.venv\Scripts\uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# Terminal 2 — Frontend React + Vite (puerto 5182)
 npm run dev
 ```
 
-Se abre en http://localhost:5182 (la fase 1 usa el 5181; cada puerto guarda su propio avance).
+* **Aplicación web:** http://localhost:5182
+* **Documentación interactiva del API (Swagger):** http://127.0.0.1:8000/docs
 
-## Qué funciona
+## Cuentas de demostración (precargadas automáticamente en `backend/anden.db`)
 
-| Dónde | Qué puedes hacer |
-| --- | --- |
-| Aula | Reproductor propio: botón ▶/❚❚, línea de tiempo con las marcas de cada pregunta y contador |
-| Aula | El video se detiene solo en el segundo de cada pregunta y la pregunta aparece debajo, dentro del reproductor. Hasta acertar no se puede seguir: el botón y la línea se bloquean, y si se intenta reproducir desde el menú del navegador se vuelve a pausar |
-| Aula | Solo se puede adelantar hasta lo ya visto (tramo claro de la línea). Hacia atrás siempre se puede |
-| Aula | Al volver a una lección sigue desde donde quedaste ("Continúas desde 0:18") |
-| Aula | Al terminar el video: "Lección completada +50 XP" y se desbloquea la siguiente. Al terminar un curso, +150 XP más |
-| Aula | Las lecciones se abren en orden: una lección bloqueada muestra a cuál volver |
-| Header | El nivel y su barrita cambian en el momento en que ganas XP |
-| Inicio | "Te quedaste en…" muestra la lección real y cuánto falta; la línea y los porcentajes salen del progreso |
-| Cursos | Los 6 cursos tienen contenido: 39 lecciones con video y 102 preguntas |
-| Mi progreso | Nivel, XP, lecciones completadas, preguntas acertadas y minutos reales; botón Reiniciar progreso |
-| Todo | Al recargar (F5) nada se pierde: el progreso se guarda en este equipo |
+| Rol | Usuario | Contraseña | Permisos |
+| --- | --- | --- | --- |
+| **Administrador general** | `admin` | `1234` | Control total: cursos, videos/checkpoints, aprobar accesos y **crear cuentas de Profesor / Admin** |
+| **Profesor** | `profe` | `1234` | Gestiona cursos, sube videos con checkpoints y aprueba solicitudes de acceso de estudiantes |
+| **Estudiante** | `diego` | `1234` | Cursos gratis + cursos autorizados, progreso inicial, 12 días de racha y certificado de *PHP desde cero* |
 
-## Reglas del juego
+> Cualquier estudiante nuevo puede crear su propia cuenta desde la pestaña **Crear cuenta** en el Login (siempre con rol `estudiante`).
 
-- +20 XP por acertar al primer intento, +5 si se acierta después. Si fallas, la opción se tacha y vuelves a intentar.
-- +50 XP por lección completada (una sola vez) y +150 XP extra al terminar un curso.
-- Nivel = XP / 300, redondeado hacia abajo, más 1. Con la semilla (2340 XP) eres nivel 8; al terminar "Componentes y JSX" pasas al 9.
-- Una lección se completa cuando el video llega al final con todas sus preguntas acertadas. Repasar no vuelve a preguntar ni suma XP.
+## Funcionalidades implementadas
 
-## Guion para mostrarlo (4 minutos)
+1. **Backend FastAPI + SQLite (`backend/`):** API REST con JWT, PBKDF2, SQLAlchemy, seed automático de los 6 cursos / 39 lecciones / 106 preguntas y streaming HTTP Range para videos subidos (`backend/uploads/videos/`).
+2. **Registro propio de estudiantes + 3 roles:** `estudiante` (auto-registro), `profesor` (solo creado por el admin general) y `admin_general`. Progreso aislado por usuario.
+3. **Cursos gratis vs. restringidos:** 3 cursos gratis y 3 restringidos; los restringidos ofrecen **ambas opciones**: solicitar acceso al profesor (aprobable desde el panel) o pago simulado con referencia `SIM-...`.
+4. **5 tipos de preguntas interactivas:** Opción única, Verdadero/Falso, Múltiple respuesta, Completación y Desarrollo con **auto-evaluación básica inmediata** (palabras clave + mínimo de palabras para no bloquear el aprendizaje).
+5. **Porcentaje de aciertos y certificados:** cálculo real de aciertos por curso, modo repaso para mejorar nota y certificado imprimible/verificable (`/certificado/:cursoId`, código `ANDEN-2026-XXXXXX`) al completar con nota ≥ umbral.
+6. **Prelación de cursos (opcional):** configurable por curso desde el panel (ej. *Bases de datos SQL* → *Python para análisis*).
+7. **Colores y fondo dinámicos por curso/categoría:** el entorno del aula y el reproductor adaptan su paleta al color de cada curso manteniendo contraste legible.
+8. **Timeline interactiva de checkpoints (Admin):** vista previa siempre cargada (videos existentes y nuevos) con barra clicable y marcadores arrastrables para ubicar preguntas visualmente.
+9. **Favicon propio de andén:** [public/favicon.svg](public/favicon.svg) enlazado en `index.html`.
+10. **Logros y árbol de habilidades 100 % dinámicos:** racha de días reales, logros con fechas de desbloqueo y árbol de ramas actualizado según los cursos y lecciones completadas.
 
-0. Si ya lo probaste en este navegador: Mi progreso → "Reiniciar progreso" → Aceptar. Así vuelves al punto de partida (nivel 8, "Componentes y JSX" en 0:18).
-1. Inicio: "Componentes y JSX, te falta 0:42". "Seguir la lección": dice "Continúas desde 0:18".
-2. A los 0:20 el video se detiene solo y la pregunta aparece debajo. El botón ▶ no hace nada. Elegir "Un archivo CSS" (se tacha) y luego "Elementos JSX": suma 5 XP por acertar al segundo intento.
-3. "Continuar". Intentar arrastrar la línea hacia adelante: no pasa de lo ya visto.
-4. Pregunta de 0:45 y final del video: "Lección completada +50 XP". En el header pasa a Nivel 9 y la barrita vuelve a empezar; en el temario se desbloquea "Props: pasar datos".
-5. Escribir `/aula/1/105`: "Lección bloqueada".
-6. F5: todo sigue igual. Mi progreso → Reiniciar progreso.
+## Pruebas automatizadas
 
-## Conceptos nuevos y dónde están
+```bash
+# Pruebas del backend (FastAPI + SQLite temporal)
+cd backend
+.venv\Scripts\pytest -v
 
-| Concepto | Archivo | Cómo explicarlo |
-| --- | --- | --- |
-| Context (`createContext`, `Provider`, `useContext`) y el hook propio `useProgreso` | `contextos/ProgresoContext.jsx`, `App.jsx` | Datos que ven todas las páginas, como `$_SESSION` en PHP. `useProgreso()` es un atajo a `useContext(ProgresoContext)`: cualquier componente pide el progreso y las acciones en una línea. Empieza con `use` porque por dentro llama a un hook, y React solo deja llamar hooks dentro de componentes o de funciones que empiezan con `use` |
-| `<Navigate replace>` | `pages/Aula.jsx` | Como `header('Location')` en PHP: `/aula` y `/aula/1` pasan a la dirección completa de la lección, así no cambia sola al completarla |
-| `localStorage` + `JSON.stringify` / `JSON.parse` | `contextos/ProgresoContext.jsx` | Una sesión que queda guardada en el equipo. El `try/catch` es como el de PDO |
-| `useEffect` | `contextos/ProgresoContext.jsx` | "Después de dibujar, si cambió el progreso, guárdalo" |
-| `useState` con función inicial | `contextos/ProgresoContext.jsx` | `useState(leerGuardado)` lee lo guardado solo la primera vez |
-| `setProgreso((anterior) => …)` y `structuredClone` | `contextos/ProgresoContext.jsx` | Se copia el progreso, se cambia la copia y se devuelve: el estado nunca se modifica directamente |
-| `useRef` | `components/Reproductor.jsx` | Guarda el `<video>` real, como `document.getElementById` |
-| API de medios del navegador | `components/Reproductor.jsx` | `play()`, `pause()`, `currentTime`, `duration` y los eventos `onLoadedMetadata`, `onTimeUpdate`, `onPlay`, `onPause`, `onSeeking`, `onEnded` |
-| `<input type="range">` controlado | `components/Reproductor.jsx` | La línea de tiempo: se arrastra con el mouse y se mueve con las flechas |
-| La prop `key` para reiniciar | `pages/Aula.jsx` | `key={leccion.id}`: al cambiar de lección el reproductor empieza de cero |
-| Funciones puras | `logica/progreso.js`, `logica/gamificacion.js` | Reciben datos y devuelven un resultado, como funciones de PHP. Nada se guarda dos veces: estados, porcentajes y nivel se calculan |
-
-## Lo que todavía no hace
-
-- Los datos se importan directamente del JSON; todavía no "llegan de un servidor". **Fase 3.**
-- Los logros, el árbol de habilidades y los días seguidos siguen fijos en `usuario.json`. **Fase 3.**
-- No hay avisos en vivo, ni modo sin conexión, ni velocidad, volumen o pantalla completa en el reproductor. **Fase 3.**
+# Linter y build del frontend
+npm run lint
+npm run build
+```

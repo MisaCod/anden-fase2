@@ -1,18 +1,18 @@
-import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contextos/AuthContext.jsx'
 import { CursosProvider } from './contextos/CursosContext.jsx'
 import { ProgresoProvider } from './contextos/ProgresoContext.jsx'
-import Header from './components/Header.jsx'
 import Footer from './components/Footer.jsx'
-import Inicio from './pages/Inicio.jsx'
-import Cursos from './pages/Cursos.jsx'
-import Aula from './pages/Aula.jsx'
-import Progreso from './pages/Progreso.jsx'
-import Logros from './pages/Logros.jsx'
-import Login from './pages/Login.jsx'
+import Header from './components/Header.jsx'
 import Admin from './pages/Admin.jsx'
+import Aula from './pages/Aula.jsx'
+import Certificado from './pages/Certificado.jsx'
+import Cursos from './pages/Cursos.jsx'
+import Inicio from './pages/Inicio.jsx'
+import Login from './pages/Login.jsx'
+import Logros from './pages/Logros.jsx'
+import Progreso from './pages/Progreso.jsx'
 
-// Contenedor para las páginas que usan el Header y Footer originales
 function VistaEstudiante({ children }) {
   return (
     <>
@@ -24,22 +24,26 @@ function VistaEstudiante({ children }) {
 }
 
 function ContenidoApp() {
-  const { estaAutenticado, esAdmin } = useAuth()
+  const { estaAutenticado, esStaff, cargandoAuth } = useAuth()
 
-  // 1. Si no ha iniciado sesión, se muestra primero el menú de inicio de sesión
+  if (cargandoAuth) {
+    return (
+      <div className="login-pantalla">
+        <p className="texto-suave">Verificando sesión…</p>
+      </div>
+    )
+  }
+
   if (!estaAutenticado) {
     return <Login />
   }
 
-  // 2. Si ha iniciado sesión, se muestra la interfaz debida según el nivel de acceso
   return (
     <Routes>
-      {esAdmin ? (
-        // Rutas del Administrador
+      {esStaff ? (
         <>
           <Route path="/admin" element={<Admin />} />
           <Route path="/" element={<Admin />} />
-          {/* Permite al admin inspeccionar la vista de estudiante si lo desea */}
           <Route
             path="/cursos"
             element={
@@ -72,10 +76,17 @@ function ContenidoApp() {
               </VistaEstudiante>
             }
           />
+          <Route
+            path="/certificado/:cursoId"
+            element={
+              <VistaEstudiante>
+                <Certificado />
+              </VistaEstudiante>
+            }
+          />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </>
       ) : (
-        // Rutas del usuario Diego (u otro estudiante): interfaz existente
         <>
           <Route
             path="/"
@@ -117,9 +128,15 @@ function ContenidoApp() {
               </VistaEstudiante>
             }
           />
-          {/* Si Diego intenta acceder a la ruta de admin, se redirige al inicio */}
+          <Route
+            path="/certificado/:cursoId"
+            element={
+              <VistaEstudiante>
+                <Certificado />
+              </VistaEstudiante>
+            }
+          />
           <Route path="/admin" element={<Navigate to="/" replace />} />
-          {/* Cualquier otra dirección desconocida */}
           <Route
             path="*"
             element={
@@ -148,7 +165,6 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <CursosProvider>
-          {/* ProgresoProvider puede leer y cambiar el progreso de los cursos */}
           <ProgresoProvider>
             <ContenidoApp />
           </ProgresoProvider>
