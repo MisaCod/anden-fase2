@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { useCursos } from '../contextos/CursosContext.jsx'
+import { useProgreso } from '../contextos/ProgresoContext.jsx'
 import BarraProgreso from '../components/BarraProgreso.jsx'
+import ModalAccesoCurso from '../components/ModalAccesoCurso.jsx'
 import Reproductor from '../components/Reproductor.jsx'
 import TituloParada from '../components/TituloParada.jsx'
-import { useProgreso } from '../contextos/ProgresoContext.jsx'
 import { formatoTiempo } from '../logica/formato.js'
 import {
   avanceDe,
@@ -15,74 +17,169 @@ import {
   siguienteLeccion,
 } from '../logica/progreso.js'
 
-// Mensaje para cuando no hay una lección que mostrar
-function MensajeAula({ titulo }) {
+function MensajeAula({ titulo, detalle }) {
   return (
     <section className="encabezado">
       <h1>{titulo}</h1>
       <p>
-        Elige otro curso en <Link to="/cursos" className="enlace">Cursos</Link>.
+        {detalle || (
+          <>
+            Elige otro curso en <Link to="/cursos" className="enlace">Cursos</Link>.
+          </>
+        )}
       </p>
     </section>
   )
 }
 
 function Aula() {
-  const { cursos } = useCursos()
-  // Los parámetros de la URL (/aula/1/102) llegan como texto, igual que $_GET en PHP
+  const { cursos, cargandoCursos } = useCursos()
   const { cursoId, leccionId } = useParams()
-  const { progreso } = useProgreso()
+  const { progreso, estadisticasPorCurso, certificados } = useProgreso()
+  const [mostrarModalAcceso, setMostrarModalAcceso] = useState(false)
+  const [modoRepaso, setModoRepaso] = useState(false)
 
-  // Sin parámetros se abre la misma lección que propone Inicio
-  const seguir = leccionParaSeguir(cursos, progreso)
+  if (cargandoCursos && cursos.length === 0) {
+    return <p className="texto-suave">Cargando aula…</p>
+  }
 
-  // 1. El curso: el de la URL o, si no viene, el de la lección para seguir
+  const cursosAccesibles = cursos.filter((c) => c.tieneAcceso !== false && c.prelacionCumplida !== false)
+  const seguir = leccionParaSeguir(cursosAccesibles, progreso)
+
   let curso
   if (cursoId) curso = cursos.find((c) => c.id === Number(cursoId))
   else if (seguir) curso = seguir.curso
-  else curso = cursos[0]
+  else curso = cursosAccesibles[0] || cursos[0]
 
   if (!curso) return <MensajeAula titulo="No encontramos ese curso" />
 
-  // 2. La lección: la de la URL; sin parámetros, la que propone Inicio;
-  // si no, la actual del curso (o la primera si ya terminó)
+  // Guard 1: curso restringido sin permiso
+  if (curso.tieneAcceso === false) {
+    return (
+      <div className="aula-entorno" style={{ '--color-linea': curso.color }}>
+        <section className="encabezado aula-bloqueo-card">
+          <span className="etiqueta-acceso restringido">Curso restringido</span>
+          <h1>{curso.titulo}</h1>
+          <p>{curso.descripcion}</p>
+          <p className="texto-suave">
+            {curso.estadoAcceso === 'pendiente'
+              ? 'Tu solicitud de acceso está pendiente de aprobación por un profesor o administrador.'
+              : 'Este curso requiere permiso del profesor o realizar el pago simulado para desbloquear sus lecciones.'}
+          </p>
+          <div className="botones">
+            <button
+              type="button"
+              className="boton"
+              onClick={() => setMostrarModalAcceso(true)}
+            >
+              {curso.estadoAcceso === 'pendiente' ? 'Ver solicitud / Pago simulado' : 'Solicitar acceso o pagar'}
+            </button>
+            <Link to="/cursos" className="boton boton-claro">Volver al catálogo</Link>
+          </div>
+        </section>
+
+        {mostrarModalAcceso && (
+          <ModalAccesoCurso curso={curso} alCerrar={() => setMostrarModalAcceso(false)} />
+        )}
+      </div>
+    )
+  }
+
+  // Guard 2: prelación de curso no cumplida
+  if (curso.prelacionCumplida === false && curso.prerequisitoCursoId) {
+    return (
+      <div className="aula-entorno" style={{ '--color-linea': curso.color }}>
+        <section className="encabezado aula-bloqueo-card">
+          <span className="etiqueta-prelacion falta">Prelación requerida</span>
+          <h1>Completa primero {curso.prerequisitoTitulo}</h1>
+          <p className="texto-suave">
+            Para cursar <strong>{curso.titulo}</strong> primero debes finalizar todas las lecciones de{' '}
+            <strong>{curso.prerequisitoTitulo}</strong>.
+          </p>
+          <div className="botones">
+            <Link to={'/aula/' + curso.prerequisitoCursoId} className="boton">
+              Ir a {curso.prerequisitoTitulo}
+            </Link>
+            <Link to="/cursos" className="boton boton-claro">Volver a cursos</Link>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
   const lecciones = leccionesDe(curso)
   let leccion
   if (leccionId) leccion = lecciones.find((l) => l.id === Number(leccionId))
-  else if (!cursoId && seguir) leccion = seguir.leccion
+  else if (!cursoId && seguir && seguir.curso.id === curso.id) leccion = seguir.leccion
   else leccion = leccionActual(curso, progreso) || lecciones[0]
 
   if (!leccion) return <MensajeAula titulo="No encontramos esa lección" />
 
-  // Sin lección en la URL se pasa a la dirección completa, como header('Location') en PHP.
-  // Así la lección queda fija y no cambia sola al completarla. replace evita que Atrás vuelva aquí
   if (!leccionId) return <Navigate to={'/aula/' + curso.id + '/' + leccion.id} replace />
 
-  // 3. Las lecciones se abren en orden: las pendientes están bloqueadas
   if (estadoLeccion(curso, leccion, progreso) === 'pendiente') {
-    // Si hay una pendiente, el curso no está terminado: siempre hay una lección actual
     const actual = leccionActual(curso, progreso)
     return (
-      <section className="encabezado">
-        <h1>Lección bloqueada</h1>
-        <p>
-          Primero termina{' '}
-          <Link to={'/aula/' + curso.id + '/' + actual.id} className="enlace">{actual.titulo}</Link>.
-        </p>
-      </section>
+      <div className="aula-entorno" style={{ '--color-linea': curso.color }}>
+        <section className="encabezado aula-bloqueo-card">
+          <h1>Lección bloqueada</h1>
+          <p>
+            Primero termina{' '}
+            <Link to={'/aula/' + curso.id + '/' + actual.id} className="enlace">
+              {actual.titulo}
+            </Link>
+            .
+          </p>
+        </section>
+      </div>
     )
   }
 
   const modulo = curso.modulos.find((m) => m.lecciones.includes(leccion))
-  const porcentaje = porcentajeCurso(curso, progreso)
+  const statsCurso = estadisticasPorCurso[String(curso.id)]
+  const porcentaje = statsCurso ? statsCurso.porcentajeAvance : porcentajeCurso(curso, progreso)
+  const certificado = certificados.find((c) => c.cursoId === curso.id)
+  const leccionCompletada = avanceDe(progreso, leccion.id).completada
 
   return (
-    <div style={{ '--color-linea': curso.color }}>
-      <section className="encabezado">
-        <p>
-          {curso.titulo}, módulo {modulo.id}: {modulo.titulo}
-        </p>
-        <h1>{leccion.titulo}</h1>
+    <div className="aula-entorno" style={{ '--color-linea': curso.color }}>
+      <section className="encabezado aula-encabezado-tematico">
+        <div className="aula-encabezado-superior">
+          <div>
+            <p className="aula-ruta-migas">
+              <span className="aula-badge-cat">{curso.categoria}</span>
+              {curso.titulo} · {modulo?.titulo}
+            </p>
+            <h1>{leccion.titulo}</h1>
+          </div>
+
+          <div className="aula-metricas-rapidas">
+            {statsCurso && statsCurso.preguntasRespondidas > 0 && (
+              <div className="aula-aciertos-pill">
+                <span>Aciertos del curso</span>
+                <strong>
+                  {statsCurso.porcentajeAciertos}%{' '}
+                  <small>(mín. {statsCurso.umbralCertificado}%)</small>
+                </strong>
+              </div>
+            )}
+            {certificado && (
+              <Link to={'/certificado/' + curso.id} className="boton boton-certificado-pill">
+                Ver certificado
+              </Link>
+            )}
+            {leccionCompletada && (leccion.cuestionarios || []).length > 0 && (
+              <button
+                type="button"
+                className={`boton ${modoRepaso ? '' : 'boton-claro'}`}
+                onClick={() => setModoRepaso((prev) => !prev)}
+              >
+                {modoRepaso ? 'Salir de repaso de preguntas' : 'Repasar preguntas'}
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="progreso-curso">
           <BarraProgreso porcentaje={porcentaje} />
           <span>{porcentaje}%</span>
@@ -91,12 +188,12 @@ function Aula() {
 
       <div className="aula">
         <div>
-          {/* key: al cambiar de lección el reproductor empieza de cero */}
           <Reproductor
-            key={leccion.id}
+            key={`${leccion.id}-${modoRepaso ? 'repaso' : 'normal'}`}
             curso={curso}
             leccion={leccion}
             siguiente={siguienteLeccion(curso, leccion)}
+            modoRepaso={modoRepaso}
           />
         </div>
 

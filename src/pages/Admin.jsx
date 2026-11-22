@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import BarraProgreso from '../components/BarraProgreso.jsx'
+import TimelineCheckpoints from '../components/TimelineCheckpoints.jsx'
 import { useAuth } from '../contextos/AuthContext.jsx'
 import { useCursos } from '../contextos/CursosContext.jsx'
-import BarraProgreso from '../components/BarraProgreso.jsx'
-import { leccionesDe } from '../logica/progreso.js'
-import { guardarVideoBlob } from '../logica/almacenamientoVideos.js'
 import { formatoTiempo } from '../logica/formato.js'
+import { leccionesDe } from '../logica/progreso.js'
+import { apiFetch, subirVideoServidor } from '../servicios/api.js'
 
 const PALETA_COLORES = [
   { nombre: 'Petróleo', hex: '#2f6f73' },
@@ -16,8 +17,104 @@ const PALETA_COLORES = [
   { nombre: 'Azul Eléctrico', hex: '#2563eb' },
 ]
 
+const COLOR_POR_CATEGORIA = {
+  Programación: '#2f6f73',
+  Diseño: '#8e6c8a',
+  Datos: '#e59b34',
+}
+
+const TIPOS_PREGUNTA = [
+  { id: 'opcion_unica', label: 'Opción única' },
+  { id: 'verdadero_falso', label: 'Verdadero / Falso' },
+  { id: 'multiple_respuesta', label: 'Múltiple respuesta' },
+  { id: 'completacion', label: 'Completación' },
+  { id: 'desarrollo', label: 'Desarrollo (auto-evaluado)' },
+]
+
+function crearCheckpointBase(segundoTotal = 20) {
+  return {
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    minuto: Math.floor(segundoTotal / 60),
+    segundo: segundoTotal % 60,
+    tipo: 'opcion_unica',
+    pregunta: '',
+    opciones: ['Opción 1', 'Opción 2', 'Opción 3', 'Opción 4'],
+    correcta: 0,
+    correctas: [0, 1],
+    respuestasAceptadasTexto: '',
+    palabrasClaveTexto: '',
+    minPalabras: 8,
+    pista: '',
+    explicacion: '',
+  }
+}
+
+function normalizarCheckpointDesdeApi(q, idx = 0) {
+  const tipo = q.tipo || 'opcion_unica'
+  return {
+    id: q.id || Date.now() + idx,
+    minuto: Math.floor((q.segundo || 0) / 60),
+    segundo: (q.segundo || 0) % 60,
+    tipo,
+    pregunta: q.pregunta || '',
+    opciones:
+      tipo === 'verdadero_falso'
+        ? ['Verdadero', 'Falso']
+        : Array.isArray(q.opciones) && q.opciones.length >= 2
+        ? [...q.opciones]
+        : ['Opción 1', 'Opción 2', 'Opción 3', 'Opción 4'],
+    correcta: q.correcta !== undefined ? Number(q.correcta) : 0,
+    correctas: Array.isArray(q.correctas) && q.correctas.length > 0 ? [...q.correctas] : [0],
+    respuestasAceptadasTexto: Array.isArray(q.respuestasAceptadas)
+      ? q.respuestasAceptadas.join(', ')
+      : '',
+    palabrasClaveTexto: Array.isArray(q.palabrasClave) ? q.palabrasClave.join(', ') : '',
+    minPalabras: Number(q.minPalabras || 8),
+    pista: q.pista || '',
+    explicacion: q.explicacion || '',
+  }
+}
+
+function serializarCheckpointParaApi(cp) {
+  const segundo = Math.max(0, Number(cp.minuto || 0) * 60 + Number(cp.segundo || 0))
+  const tipo = cp.tipo || 'opcion_unica'
+  const base = {
+    id: cp.id && cp.id < 1_000_000_000_000 ? cp.id : null,
+    segundo,
+    tipo,
+    pregunta: (cp.pregunta || '').trim(),
+    explicacion: (cp.explicacion || '').trim(),
+  }
+
+  if (tipo === 'opcion_unica') {
+    base.opciones = (cp.opciones || []).map((o) => o.trim()).filter(Boolean)
+    base.correcta = Number(cp.correcta || 0)
+  } else if (tipo === 'verdadero_falso') {
+    base.opciones = ['Verdadero', 'Falso']
+    base.correcta = Number(cp.correcta) === 1 ? 1 : 0
+  } else if (tipo === 'multiple_respuesta') {
+    base.opciones = (cp.opciones || []).map((o) => o.trim()).filter(Boolean)
+    base.correctas = Array.isArray(cp.correctas) ? cp.correctas.map(Number) : [0]
+  } else if (tipo === 'completacion') {
+    base.respuestasAceptadas = (cp.respuestasAceptadasTexto || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    base.pista = (cp.pista || '').trim()
+  } else if (tipo === 'desarrollo') {
+    base.palabrasClave = (cp.palabrasClaveTexto || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    base.minPalabras = Math.max(3, Number(cp.minPalabras) || 8)
+    base.pista = (cp.pista || '').trim()
+  }
+
+  return base
+}
+
 function Admin() {
-  const { usuarioActual, cerrarSesion } = useAuth()
+  const { usuarioActual, cerrarSesion, esAdminGeneral } = useAuth()
   const {
     cursos,
     agregarCurso,
@@ -28,12 +125,10 @@ function Admin() {
   } = useCursos()
   const navigate = useNavigate()
 
-  // Pestaña activa: 'cursos' o 'videos'
+  // Pestañas: 'cursos' | 'videos' | 'solicitudes' | 'usuarios'
   const [pestanaActiva, setPestanaActiva] = useState('cursos')
 
-  // ==============================================================
-  // ESTADOS PARA CURSOS (CREACIÓN Y EDICIÓN)
-  // ==============================================================
+  // ==================== CURSOS ====================
   const [cursoEditandoId, setCursoEditandoId] = useState(null)
   const [titulo, setTitulo] = useState('')
   const [categoria, setCategoria] = useState('Programación')
@@ -41,93 +136,159 @@ function Admin() {
   const [nivel, setNivel] = useState('Principiante')
   const [descripcion, setDescripcion] = useState('')
   const [color, setColor] = useState('#2f6f73')
-
-  // Estructura dinámica de módulos y lecciones
+  const [tipoAcceso, setTipoAcceso] = useState('gratis')
+  const [precio, setPrecio] = useState('14.99')
+  const [umbralCertificado, setUmbralCertificado] = useState('70')
+  const [prerequisitoCursoId, setPrerequisitoCursoId] = useState('')
   const [modulos, setModulos] = useState([
     {
-      id: 1,
+      id: null,
       titulo: 'Módulo 1: Fundamentos',
-      lecciones: [
-        { id: 101, titulo: '101. Introducción al curso', duracion: 60 },
-      ],
+      lecciones: [{ id: null, titulo: 'Introducción al curso', duracion: 60, video: '/videos/101.mp4' }],
     },
   ])
-
-  // Estados de retroalimentación de cursos
   const [errores, setErrores] = useState({})
   const [mensajeExito, setMensajeExito] = useState('')
+  const [guardandoCurso, setGuardandoCurso] = useState(false)
   const [filtroTexto, setFiltroTexto] = useState('')
-
+  const [confirmandoEliminarId, setConfirmandoEliminarId] = useState(null)
   const seccionFormularioCursoRef = useRef(null)
 
-  // ==============================================================
-  // ESTADOS PARA LA GESTIÓN Y SUBIDA DE VIDEOS
-  // ==============================================================
-  const [cursoVideoId, setCursoVideoId] = useState(cursos[0]?.id || 1)
+  // ==================== VIDEOS Y CHECKPOINTS ====================
+  const [cursoVideoId, setCursoVideoId] = useState(() => cursos[0]?.id || 1)
   const [modoAsignacion, setModoAsignacion] = useState('existente') // 'existente' | 'nueva'
   const [leccionVideoId, setLeccionVideoId] = useState('')
-  const [editandoVideoLeccionId, setEditandoVideoLeccionId] = useState(null)
   const [videoActualReferencia, setVideoActualReferencia] = useState('')
-
   const [nuevoTituloLeccion, setNuevoTituloLeccion] = useState('')
-  const [moduloDestinoId, setModuloDestinoId] = useState(1)
-  const [calidadVideo, setCalidadVideo] = useState('1080')
+  const [moduloDestinoId, setModuloDestinoId] = useState('')
   const [duracionDetectada, setDuracionDetectada] = useState(60)
-
-  // Archivo y vista previa de video
   const [archivoVideo, setArchivoVideo] = useState(null)
   const [previsualizacionUrl, setPrevisualizacionUrl] = useState(null)
   const [arrastrando, setArrastrando] = useState(false)
   const [guardandoVideo, setGuardandoVideo] = useState(false)
   const [erroresVideo, setErroresVideo] = useState({})
-  const [mensajeExitoVideo, setMensajeExitoVideo] = useState(null)
-
-  // Checkpoints y preguntas interactivas
+  const [mensajeExitoVideo, setMensajeExitoVideo] = useState('')
   const [checkpoints, setCheckpoints] = useState([])
+  const [checkpointActivo, setCheckpointActivo] = useState(null)
 
   const inputFileRef = useRef(null)
   const previewVideoRef = useRef(null)
   const seccionSubidaRef = useRef(null)
 
-  // Curso seleccionado actualmente para videos y sus lecciones
-  const cursoParaVideo =
-    cursos.find((c) => Number(c.id) === Number(cursoVideoId)) || cursos[0]
-  const leccionesCursoVideo = cursoParaVideo ? leccionesDe(cursoParaVideo) : []
-  const modulosCursoVideo = cursoParaVideo?.modulos || []
+  // ==================== SOLICITUDES Y ACCESOS ====================
+  const [solicitudes, setSolicitudes] = useState([])
+  const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false)
+  const [mensajeAcceso, setMensajeAcceso] = useState('')
+  const [manualUsuarioId, setManualUsuarioId] = useState('')
+  const [manualCursoId, setManualCursoId] = useState('')
 
-  // Sincronizar lección por defecto cuando cambia el curso seleccionado
+  // ==================== USUARIOS Y ROLES ====================
+  const [usuariosLista, setUsuariosLista] = useState([])
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
+  const [nuevoUserNombre, setNuevoUserNombre] = useState('')
+  const [nuevoUserUsername, setNuevoUserUsername] = useState('')
+  const [nuevoUserEmail, setNuevoUserEmail] = useState('')
+  const [nuevoUserPassword, setNuevoUserPassword] = useState('')
+  const [nuevoUserRol, setNuevoUserRol] = useState('profesor')
+  const [mensajeUsuario, setMensajeUsuario] = useState('')
+  const [errorUsuario, setErrorUsuario] = useState('')
+
+  // Sincronizar cursoVideoId cuando cargan los cursos
   useEffect(() => {
-    if (leccionesCursoVideo.length > 0) {
-      const existe = leccionesCursoVideo.some((l) => Number(l.id) === Number(leccionVideoId))
-      if (!existe && !editandoVideoLeccionId) {
-        setLeccionVideoId(leccionesCursoVideo[0].id)
-      }
-    } else {
-      setLeccionVideoId('')
+    if (cursos.length > 0 && !cursos.some((c) => c.id === Number(cursoVideoId))) {
+      setCursoVideoId(cursos[0].id)
     }
-  }, [cursoVideoId, leccionesCursoVideo, editandoVideoLeccionId])
+  }, [cursos, cursoVideoId])
+
+  const cursoParaVideo = cursos.find((c) => Number(c.id) === Number(cursoVideoId)) || cursos[0]
+  const leccionesCursoVideo = cursoParaVideo ? leccionesDe(cursoParaVideo) : []
+  const modulosCursoVideo = useMemo(
+    () => (cursoParaVideo ? cursoParaVideo.modulos : []),
+    [cursoParaVideo]
+  )
+
+  // Mantener moduloDestinoId válido
+  useEffect(() => {
+    if (modulosCursoVideo.length > 0 && !modulosCursoVideo.some((m) => m.id === Number(moduloDestinoId))) {
+      setModuloDestinoId(modulosCursoVideo[0].id)
+    }
+  }, [modulosCursoVideo, moduloDestinoId])
+
+  // Cargar primera lección automáticamente cuando cambia el curso en modo existente
+  useEffect(() => {
+    if (pestanaActiva === 'videos' && modoAsignacion === 'existente' && leccionesCursoVideo.length > 0) {
+      const existe = leccionesCursoVideo.some((l) => Number(l.id) === Number(leccionVideoId))
+      if (!existe) {
+        cargarLeccionEnEditor(leccionesCursoVideo[0])
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pestanaActiva, cursoVideoId, modoAsignacion])
+
+  const cargarSolicitudesYEstudiantes = useCallback(async () => {
+    setCargandoSolicitudes(true)
+    try {
+      const [sols, usrs] = await Promise.all([
+        apiFetch('/api/admin/solicitudes'),
+        apiFetch('/api/admin/usuarios'),
+      ])
+      setSolicitudes(Array.isArray(sols) ? sols : [])
+      setUsuariosLista(Array.isArray(usrs) ? usrs : [])
+    } catch {
+      // Ignorar si hubo fallo transitorio
+    } finally {
+      setCargandoSolicitudes(false)
+    }
+  }, [])
+
+  const cargarUsuarios = useCallback(async () => {
+    setCargandoUsuarios(true)
+    try {
+      const usrs = await apiFetch('/api/admin/usuarios')
+      setUsuariosLista(Array.isArray(usrs) ? usrs : [])
+    } catch {
+      // Ignorar
+    } finally {
+      setCargandoUsuarios(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (pestanaActiva === 'solicitudes') {
+      cargarSolicitudesYEstudiantes()
+    } else if (pestanaActiva === 'usuarios' && esAdminGeneral) {
+      cargarUsuarios()
+    }
+  }, [pestanaActiva, esAdminGeneral, cargarSolicitudesYEstudiantes, cargarUsuarios])
+
+  useEffect(() => {
+    return () => {
+      if (previsualizacionUrl && previsualizacionUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previsualizacionUrl)
+      }
+    }
+  }, [previsualizacionUrl])
 
   function handleLogout() {
     cerrarSesion()
     navigate('/')
   }
 
-  // ==============================================================
-  // GESTIÓN DE MÓDULOS Y LECCIONES DINÁMICAS (CURSO)
-  // ==============================================================
+  // ==================== HANDLERS CURSOS ====================
+  function cambiarCategoria(nuevaCat) {
+    setCategoria(nuevaCat)
+    if (!cursoEditandoId && COLOR_POR_CATEGORIA[nuevaCat]) {
+      setColor(COLOR_POR_CATEGORIA[nuevaCat])
+    }
+  }
+
   function agregarModulo() {
     setModulos((prev) => [
       ...prev,
       {
-        id: Date.now(),
-        titulo: `Módulo ${prev.length + 1}: Tema`,
-        lecciones: [
-          {
-            id: Date.now() + 1,
-            titulo: 'Nueva lección',
-            duracion: 60,
-          },
-        ],
+        id: null,
+        titulo: `Módulo ${prev.length + 1}: Nuevo tema`,
+        lecciones: [{ id: null, titulo: 'Nueva lección', duracion: 60, video: '/videos/101.mp4' }],
       },
     ])
   }
@@ -148,11 +309,12 @@ function Admin() {
   function agregarLeccion(mIndex) {
     setModulos((prev) => {
       const copia = structuredClone(prev)
-      const num = copia[mIndex].lecciones.length + 1
+      const n = copia[mIndex].lecciones.length + 1
       copia[mIndex].lecciones.push({
-        id: Date.now(),
-        titulo: `Lección ${num}`,
+        id: null,
+        titulo: `Lección ${n}`,
         duracion: 60,
+        video: '/videos/101.mp4',
       })
       return copia
     })
@@ -175,175 +337,222 @@ function Admin() {
     })
   }
 
-  // ==============================================================
-  // VALIDACIÓN Y GUARDADO DE CURSO (CREACIÓN Y EDICIÓN)
-  // ==============================================================
-  function validarFormularioCurso() {
-    const err = {}
-    if (!titulo.trim()) {
-      err.titulo = 'El título del curso es obligatorio.'
-    } else if (titulo.trim().length > 40) {
-      err.titulo = 'El título del curso no puede superar los 40 caracteres.'
-    }
-
-    if (!descripcion.trim()) {
-      err.descripcion = 'La descripción del curso es obligatoria.'
-    } else if (descripcion.trim().length > 200) {
-      err.descripcion = 'La descripción del curso no puede superar los 200 caracteres.'
-    }
-
-    if (categoria === 'Otra' && !categoriaPersonalizada.trim()) {
-      err.categoria = 'Por favor escribe la categoría.'
-    }
-
-    // Validar que cada módulo tenga título y sus lecciones también
-    modulos.forEach((m, mIdx) => {
-      if (!m.titulo.trim()) {
-        err[`modulo_${mIdx}`] = `El título del Módulo ${mIdx + 1} no puede estar vacío.`
-      }
-      m.lecciones.forEach((l, lIdx) => {
-        if (!l.titulo.trim()) {
-          err[`leccion_${mIdx}_${lIdx}`] = `La lección ${lIdx + 1} del Módulo ${mIdx + 1} necesita título.`
-        }
-      })
-    })
-
-    return err
-  }
-
-  function handleGuardarCurso(e) {
-    e.preventDefault()
-    setMensajeExito('')
-
-    const valErrores = validarFormularioCurso()
-    if (Object.keys(valErrores).length > 0) {
-      setErrores(valErrores)
-      return
-    }
-
+  function cancelarEdicionCurso() {
+    setCursoEditandoId(null)
+    setTitulo('')
+    setCategoria('Programación')
+    setCategoriaPersonalizada('')
+    setNivel('Principiante')
+    setDescripcion('')
+    setColor('#2f6f73')
+    setTipoAcceso('gratis')
+    setPrecio('14.99')
+    setUmbralCertificado('70')
+    setPrerequisitoCursoId('')
+    setModulos([
+      {
+        id: null,
+        titulo: 'Módulo 1: Fundamentos',
+        lecciones: [{ id: null, titulo: 'Introducción al curso', duracion: 60, video: '/videos/101.mp4' }],
+      },
+    ])
     setErrores({})
-
-    const categoriaFinal =
-      categoria === 'Otra' ? categoriaPersonalizada.trim() : categoria
-
-    if (cursoEditandoId) {
-      // MODO EDICIÓN
-      const resultado = editarCurso(cursoEditandoId, {
-        titulo,
-        categoria: categoriaFinal,
-        nivel,
-        descripcion,
-        color,
-        modulos,
-      })
-
-      if (resultado.ok) {
-        setMensajeExito(`El curso "${titulo}" fue actualizado exitosamente.`)
-        cancelarEdicionCurso()
-      } else {
-        setErrores({ general: resultado.error || 'No se pudo actualizar el curso.' })
-      }
-    } else {
-      // MODO CREACIÓN
-      const resultado = agregarCurso({
-        titulo,
-        categoria: categoriaFinal,
-        nivel,
-        descripcion,
-        color,
-        modulos,
-      })
-
-      if (resultado.ok) {
-        setMensajeExito(`El curso "${resultado.curso.titulo}" fue agregado exitosamente al catálogo.`)
-        cancelarEdicionCurso()
-      } else {
-        setErrores({ general: resultado.error || 'No se pudo agregar el curso.' })
-      }
-    }
   }
 
   function iniciarEdicionCurso(curso) {
     setCursoEditandoId(curso.id)
     setTitulo(curso.titulo)
-    const esCatEstandar = ['Programación', 'Diseño', 'Datos', 'DevOps'].includes(curso.categoria)
-    setCategoria(esCatEstandar ? curso.categoria : 'Otra')
-    setCategoriaPersonalizada(esCatEstandar ? '' : curso.categoria)
+    const catsBase = ['Programación', 'Diseño', 'Datos']
+    if (catsBase.includes(curso.categoria)) {
+      setCategoria(curso.categoria)
+      setCategoriaPersonalizada('')
+    } else {
+      setCategoria('otra')
+      setCategoriaPersonalizada(curso.categoria)
+    }
     setNivel(curso.nivel)
     setDescripcion(curso.descripcion)
     setColor(curso.color)
-    setModulos(structuredClone(curso.modulos))
-    setMensajeExito('')
+    setTipoAcceso(curso.tipoAcceso || 'gratis')
+    setPrecio(String(curso.precio || 0))
+    setUmbralCertificado(String(curso.umbralCertificado || 70))
+    setPrerequisitoCursoId(curso.prerequisitoCursoId ? String(curso.prerequisitoCursoId) : '')
+    setModulos(
+      curso.modulos.map((m) => ({
+        id: m.id,
+        titulo: m.titulo,
+        lecciones: m.lecciones.map((l) => ({
+          id: l.id,
+          titulo: l.titulo,
+          duracion: l.duracion,
+          video: l.video,
+        })),
+      }))
+    )
     setErrores({})
-    setPestanaActiva('cursos')
+    setMensajeExito('')
     seccionFormularioCursoRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  function cancelarEdicionCurso() {
-    setCursoEditandoId(null)
-    setTitulo('')
-    setDescripcion('')
-    setCategoria('Programación')
-    setCategoriaPersonalizada('')
-    setNivel('Principiante')
-    setColor('#2f6f73')
-    setModulos([
-      {
-        id: 1,
-        titulo: 'Módulo 1: Fundamentos',
-        lecciones: [
-          { id: 101, titulo: '101. Introducción al curso', duracion: 60 },
-        ],
-      },
-    ])
+  async function handleGuardarCurso(e) {
+    e.preventDefault()
+    setMensajeExito('')
+    const catFinal = categoria === 'otra' ? categoriaPersonalizada.trim() : categoria
+    const nuevosErrores = {}
+    if (!titulo.trim()) nuevosErrores.titulo = 'El título es obligatorio.'
+    if (!descripcion.trim()) nuevosErrores.descripcion = 'La descripción es obligatoria.'
+    if (!catFinal) nuevosErrores.categoria = 'Especifica la categoría.'
+
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores)
+      return
+    }
+
     setErrores({})
+    setGuardandoCurso(true)
+
+    const payload = {
+      titulo: titulo.trim(),
+      categoria: catFinal,
+      nivel,
+      descripcion: descripcion.trim(),
+      color,
+      tipoAcceso,
+      precio: tipoAcceso === 'restringido' ? Math.max(0, Number(precio) || 0) : 0,
+      umbralCertificado: Math.min(100, Math.max(10, Number(umbralCertificado) || 70)),
+      prerequisitoCursoId: prerequisitoCursoId ? Number(prerequisitoCursoId) : null,
+      modulos: modulos.map((m) => ({
+        id: m.id || null,
+        titulo: m.titulo.trim() || 'Módulo',
+        lecciones: m.lecciones.map((l) => ({
+          id: l.id || null,
+          titulo: l.titulo.trim() || 'Lección',
+          duracion: Math.max(5, Number(l.duracion) || 60),
+          video: l.video || '/videos/101.mp4',
+        })),
+      })),
+    }
+
+    const res = cursoEditandoId
+      ? await editarCurso(cursoEditandoId, payload)
+      : await agregarCurso(payload)
+
+    setGuardandoCurso(false)
+    if (!res.ok) {
+      setErrores({ general: res.error })
+      return
+    }
+
+    setMensajeExito(
+      cursoEditandoId
+        ? `Curso "${payload.titulo}" actualizado en SQLite.`
+        : `Curso "${payload.titulo}" creado correctamente en SQLite.`
+    )
+    cancelarEdicionCurso()
   }
 
-  function handleEliminarCurso(cursoId, nombre) {
-    if (window.confirm(`¿Estás seguro de que deseas eliminar el curso "${nombre}"?`)) {
-      eliminarCurso(cursoId)
-      if (cursoEditandoId === cursoId) {
-        cancelarEdicionCurso()
-      }
-      setMensajeExito(`El curso "${nombre}" fue eliminado del catálogo.`)
+  async function handleConfirmarEliminar(cursoId) {
+    const res = await eliminarCurso(cursoId)
+    setConfirmandoEliminarId(null)
+    if (res.ok) {
+      if (cursoEditandoId === cursoId) cancelarEdicionCurso()
+      setMensajeExito('Curso eliminado correctamente.')
     }
   }
 
-  // ==============================================================
-  // GESTIÓN DE CHECKPOINTS Y PREGUNTAS INTERACTIVAS
-  // ==============================================================
-  function agregarCheckpoint() {
-    setCheckpoints((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        minuto: 0,
-        segundo: 30,
-        pregunta: '',
-        opciones: ['Opción 1', 'Opción 2', 'Opción 3', 'Opción 4'],
-        correcta: 0,
-        explicacion: '',
-      },
-    ])
+  // ==================== HANDLERS VIDEOS Y CHECKPOINTS ====================
+  function cargarLeccionEnEditor(lecc) {
+    if (!lecc) return
+    setLeccionVideoId(lecc.id)
+    setDuracionDetectada(lecc.duracion || 60)
+    setVideoActualReferencia(lecc.video || '')
+    setArchivoVideo(null)
+    if (previsualizacionUrl && previsualizacionUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previsualizacionUrl)
+    }
+    setPrevisualizacionUrl(null)
+    const cps = (lecc.cuestionarios || []).map((q, idx) => normalizarCheckpointDesdeApi(q, idx))
+    setCheckpoints(cps)
+    setCheckpointActivo(cps.length > 0 ? 0 : null)
+    setErroresVideo({})
+  }
+
+  function procesarArchivoVideo(file) {
+    if (!file) return
+    const esExtValida = /\.(mp4|webm|ogg|mov|mkv)$/i.test(file.name)
+    if (!esExtValida && !file.type.startsWith('video/')) {
+      setErroresVideo((prev) => ({
+        ...prev,
+        archivo: 'Formato no soportado. Usa .mp4, .webm, .ogg, .mov o .mkv.',
+      }))
+      return
+    }
+    if (previsualizacionUrl && previsualizacionUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previsualizacionUrl)
+    }
+    setArchivoVideo(file)
+    setPrevisualizacionUrl(URL.createObjectURL(file))
+    setErroresVideo((prev) => ({ ...prev, archivo: '' }))
+  }
+
+  function agregarCheckpointEnSegundo(segundoTotal = 20) {
+    const seguro = Math.min(Math.max(1, segundoTotal), Math.max(1, Number(duracionDetectada || 60) - 1))
+    const nuevo = crearCheckpointBase(seguro)
+    setCheckpoints((prev) => {
+      const lista = [...prev, nuevo]
+      setCheckpointActivo(lista.length - 1)
+      return lista
+    })
+  }
+
+  function moverCheckpointASegundo(cpIndex, segundoTotal) {
+    const seg = Math.max(0, Math.min(segundoTotal, Math.max(1, Number(duracionDetectada || 60) - 1)))
+    setCheckpoints((prev) => {
+      if (!prev[cpIndex]) return prev
+      const copia = structuredClone(prev)
+      copia[cpIndex].minuto = Math.floor(seg / 60)
+      copia[cpIndex].segundo = seg % 60
+      return copia
+    })
   }
 
   function eliminarCheckpoint(cpIndex) {
     setCheckpoints((prev) => prev.filter((_, idx) => idx !== cpIndex))
+    setCheckpointActivo((prev) => (prev === cpIndex ? null : prev > cpIndex ? prev - 1 : prev))
   }
 
   function actualizarCheckpoint(cpIndex, campo, valor) {
     setCheckpoints((prev) => {
       const copia = structuredClone(prev)
       copia[cpIndex][campo] = valor
+      if (campo === 'tipo') {
+        if (valor === 'verdadero_falso') {
+          copia[cpIndex].opciones = ['Verdadero', 'Falso']
+          copia[cpIndex].correcta = 0
+        } else if (valor === 'opcion_unica' || valor === 'multiple_respuesta') {
+          if (!Array.isArray(copia[cpIndex].opciones) || copia[cpIndex].opciones.length < 2) {
+            copia[cpIndex].opciones = ['Opción 1', 'Opción 2', 'Opción 3', 'Opción 4']
+          }
+          if (valor === 'multiple_respuesta' && (!copia[cpIndex].correctas || copia[cpIndex].correctas.length === 0)) {
+            copia[cpIndex].correctas = [0]
+          }
+        }
+      }
       return copia
     })
-    setErroresVideo((prev) => {
-      if (!prev[`cp_tiempo_${cpIndex}`] && !prev[`cp_${cpIndex}`] && !prev[`cp_op_${cpIndex}`] && !prev.general) return prev
-      const copia = { ...prev }
-      delete copia[`cp_tiempo_${cpIndex}`]
-      delete copia[`cp_${cpIndex}`]
-      delete copia[`cp_op_${cpIndex}`]
-      delete copia.general
+  }
+
+  function alternarCorrectaMultiple(cpIndex, opIdx) {
+    setCheckpoints((prev) => {
+      const copia = structuredClone(prev)
+      const actual = Array.isArray(copia[cpIndex].correctas) ? copia[cpIndex].correctas : []
+      if (actual.includes(opIdx)) {
+        if (actual.length > 1) {
+          copia[cpIndex].correctas = actual.filter((i) => i !== opIdx)
+        }
+      } else {
+        copia[cpIndex].correctas = [...actual, opIdx].sort((a, b) => a - b)
+      }
       return copia
     })
   }
@@ -371,322 +580,227 @@ function Admin() {
       const copia = structuredClone(prev)
       if (copia[cpIndex].opciones.length > 2) {
         copia[cpIndex].opciones = copia[cpIndex].opciones.filter((_, idx) => idx !== opIndex)
-        if (copia[cpIndex].correcta >= copia[cpIndex].opciones.length) {
-          copia[cpIndex].correcta = 0
-        }
+        if (copia[cpIndex].correcta >= copia[cpIndex].opciones.length) copia[cpIndex].correcta = 0
+        copia[cpIndex].correctas = (copia[cpIndex].correctas || [])
+          .filter((i) => i !== opIndex)
+          .map((i) => (i > opIndex ? i - 1 : i))
+        if (copia[cpIndex].correctas.length === 0) copia[cpIndex].correctas = [0]
       }
       return copia
     })
   }
 
-  function capturarTiempoActualPreview(cpIndex) {
-    if (previewVideoRef.current) {
-      let sec = Math.round(previewVideoRef.current.currentTime)
-      if (duracionDetectada > 0 && sec >= duracionDetectada) {
-        sec = Math.max(1, duracionDetectada - 1)
-      }
-      actualizarCheckpoint(cpIndex, 'minuto', Math.floor(sec / 60))
-      actualizarCheckpoint(cpIndex, 'segundo', sec % 60)
-    }
-  }
-
-  // ==============================================================
-  // FUNCIONES PARA PROCESAR Y GUARDAR VIDEOS
-  // ==============================================================
-  function procesarArchivoVideo(file) {
-    if (!file) return
-
-    const formatosValidos = [
-      'video/mp4',
-      'video/webm',
-      'video/ogg',
-      'video/quicktime',
-      'video/x-matroska',
-    ]
-    const esExtensionValida = /\.(mp4|webm|ogg|mov|mkv)$/i.test(file.name)
-
-    if (!formatosValidos.includes(file.type) && !esExtensionValida) {
-      setErroresVideo((prev) => ({
-        ...prev,
-        archivo: 'Formato no soportado. Por favor selecciona un archivo .mp4, .webm u .ogg.',
-      }))
-      return
-    }
-
-    if (previsualizacionUrl) {
-      URL.revokeObjectURL(previsualizacionUrl)
-    }
-
-    const url = URL.createObjectURL(file)
-    setArchivoVideo(file)
-    setPrevisualizacionUrl(url)
-    setErroresVideo((prev) => ({ ...prev, archivo: '', general: '' }))
-
-    // Detección automática de duración
-    const tempVideo = document.createElement('video')
-    tempVideo.preload = 'metadata'
-    tempVideo.src = url
-    tempVideo.onloadedmetadata = () => {
-      if (tempVideo.duration && !isNaN(tempVideo.duration)) {
-        const seg = Math.round(tempVideo.duration)
-        if (seg > 0) {
-          setDuracionDetectada(seg)
-        }
-      }
-    }
-  }
-
-  function quitarArchivoVideo() {
-    if (previsualizacionUrl) {
-      URL.revokeObjectURL(previsualizacionUrl)
-    }
-    setArchivoVideo(null)
-    setPrevisualizacionUrl(null)
-    if (inputFileRef.current) inputFileRef.current.value = ''
-  }
-
-  function iniciarEdicionVideoLeccion(leccion, cursoId) {
-    setCursoVideoId(cursoId)
-    setModoAsignacion('existente')
-    setLeccionVideoId(leccion.id)
-    setEditandoVideoLeccionId(leccion.id)
-    setDuracionDetectada(leccion.duracion || 60)
-    setVideoActualReferencia(leccion.video || '')
-
-    // Cargar checkpoints existentes si los tiene
-    if (Array.isArray(leccion.cuestionarios) && leccion.cuestionarios.length > 0) {
-      setCheckpoints(
-        leccion.cuestionarios.map((q, idx) => ({
-          id: q.id || Date.now() + idx,
-          minuto: Math.floor((q.segundo || 0) / 60),
-          segundo: (q.segundo || 0) % 60,
-          pregunta: q.pregunta || '',
-          opciones: Array.isArray(q.opciones) && q.opciones.length > 0 ? [...q.opciones] : ['Opción 1', 'Opción 2'],
-          correcta: q.correcta !== undefined ? q.correcta : 0,
-          explicacion: q.explicacion || '',
-        }))
-      )
-    } else {
-      setCheckpoints([])
-    }
-
-    quitarArchivoVideo()
-    setMensajeExitoVideo(null)
-    setErroresVideo({})
-    setPestanaActiva('videos')
-    seccionSubidaRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
-  function cancelarEdicionVideo() {
-    setEditandoVideoLeccionId(null)
-    setVideoActualReferencia('')
-    setCheckpoints([])
-    quitarArchivoVideo()
-    setErroresVideo({})
-  }
-
-  async function handleSubirVideo(e) {
+  async function handleGuardarVideoYCheckpoints(e) {
     e.preventDefault()
-    setMensajeExitoVideo(null)
+    setErroresVideo({})
+    setMensajeExitoVideo('')
 
-    const err = {}
-    // Si no está en edición y no hay archivo seleccionado:
-    if (!archivoVideo && !videoActualReferencia) {
-      err.archivo = 'Debes seleccionar o arrastrar un archivo de video.'
-    }
-    if (!cursoVideoId) {
-      err.curso = 'Selecciona un curso de destino.'
-    }
     if (modoAsignacion === 'existente' && !leccionVideoId) {
-      err.leccion = 'Selecciona la lección a la que se vinculará el video.'
+      setErroresVideo({ leccion: 'Selecciona una lección.' })
+      return
     }
     if (modoAsignacion === 'nueva' && !nuevoTituloLeccion.trim()) {
-      err.titulo = 'Escribe el título para la nueva lección.'
-    }
-
-    // Validar checkpoints
-    const duracionLimite = Number(duracionDetectada) || 0
-
-    checkpoints.forEach((cp, idx) => {
-      const segundoTotal = Number(cp.minuto || 0) * 60 + Number(cp.segundo || 0)
-
-      if (segundoTotal < 0) {
-        err[`cp_tiempo_${idx}`] = `El tiempo de la Pregunta #${idx + 1} no puede ser negativo.`
-      } else if (duracionLimite > 0 && segundoTotal > duracionLimite) {
-        err[`cp_tiempo_${idx}`] = `No se pueden agregar preguntas fuera de los límites del propio video. La duración del video es de ${formatoTiempo(duracionLimite)} (${duracionLimite}s) y el checkpoint fue colocado en el segundo ${segundoTotal} (${formatoTiempo(segundoTotal)}).`
-      } else if (duracionLimite > 0 && segundoTotal >= duracionLimite) {
-        err[`cp_tiempo_${idx}`] = `No se pueden agregar preguntas fuera de los límites del propio video. El checkpoint debe colocarse antes de que finalice el video (máximo al segundo ${Math.max(1, duracionLimite - 1)}).`
-      }
-
-      if (!cp.pregunta.trim()) {
-        err[`cp_${idx}`] = `Completa el texto de la Pregunta #${idx + 1}.`
-      }
-      const opcionesValidas = cp.opciones.filter((o) => o.trim() !== '')
-      if (opcionesValidas.length < 2) {
-        err[`cp_op_${idx}`] = `La Pregunta #${idx + 1} necesita al menos 2 opciones con texto.`
-      }
-    })
-
-    if (Object.keys(err).length > 0) {
-      const hayErrorTiempo = Object.keys(err).some((k) => k.startsWith('cp_tiempo_'))
-      if (hayErrorTiempo && !err.general) {
-        err.general = 'No se pueden agregar preguntas fuera de los límites del propio video. Revisa los checkpoints señalados abajo.'
-      }
-      setErroresVideo(err)
+      setErroresVideo({ titulo: 'Escribe el título de la nueva lección.' })
       return
     }
 
-    setErroresVideo({})
+    const dur = Math.max(5, Number(duracionDetectada) || 60)
+    for (let i = 0; i < checkpoints.length; i++) {
+      const cp = checkpoints[i]
+      const seg = Number(cp.minuto || 0) * 60 + Number(cp.segundo || 0)
+      if (seg >= dur) {
+        setErroresVideo({
+          general: `La pregunta #${i + 1} (${formatoTiempo(seg)}) supera la duración del video (${formatoTiempo(dur)}).`,
+        })
+        return
+      }
+      if (!cp.pregunta.trim()) {
+        setErroresVideo({ general: `Escribe el enunciado de la pregunta #${i + 1}.` })
+        return
+      }
+      if (cp.tipo === 'completacion' && !(cp.respuestasAceptadasTexto || '').trim()) {
+        setErroresVideo({ general: `Indica al menos una respuesta aceptada en la pregunta #${i + 1}.` })
+        return
+      }
+    }
+
     setGuardandoVideo(true)
-
     try {
-      let refVideo = videoActualReferencia || '/videos/101.mp4'
-
-      // Si subió un archivo nuevo, lo guardamos en IndexedDB
+      let videoFinal = videoActualReferencia || '/videos/101.mp4'
       if (archivoVideo) {
-        const clave = 'video_' + Date.now()
-        await guardarVideoBlob(clave, archivoVideo, {
-          nombre: archivoVideo.name,
-          tamano: archivoVideo.size,
-          duracion: duracionDetectada,
-        })
-        refVideo = 'idb:' + clave
+        const up = await subirVideoServidor(archivoVideo)
+        videoFinal = up.videoUrl
       }
 
-      // Dar formato final a los cuestionarios
-      const cuestionariosFinales = checkpoints.map((cp, idx) => ({
-        id: cp.id || Date.now() + idx,
-        segundo: Number(cp.minuto || 0) * 60 + Number(cp.segundo || 0),
-        pregunta: cp.pregunta.trim(),
-        opciones: cp.opciones.map((o) => o.trim()).filter(Boolean),
-        correcta: Math.min(Math.max(0, Number(cp.correcta) || 0), cp.opciones.length - 1),
-        explicacion: (cp.explicacion || '').trim(),
-      }))
+      const cuestionariosPayload = checkpoints.map(serializarCheckpointParaApi)
 
-      if (modoAsignacion === 'existente') {
-        const resultado = actualizarVideoLeccion(
-          cursoVideoId,
-          leccionVideoId,
-          refVideo,
-          duracionDetectada,
-          cuestionariosFinales
-        )
+      const res =
+        modoAsignacion === 'existente'
+          ? await actualizarVideoLeccion(
+              cursoVideoId,
+              Number(leccionVideoId),
+              videoFinal,
+              dur,
+              cuestionariosPayload
+            )
+          : await agregarLeccionConVideo(cursoVideoId, Number(moduloDestinoId), {
+              titulo: nuevoTituloLeccion.trim(),
+              duracion: dur,
+              video: videoFinal,
+              cuestionarios: cuestionariosPayload,
+            })
 
-        if (resultado.ok) {
-          setMensajeExitoVideo({
-            texto: `El video y sus ${cuestionariosFinales.length} checkpoints fueron guardados correctamente en la lección "${resultado.leccion.titulo}".`,
-            cursoId: cursoVideoId,
-            leccionId: leccionVideoId,
-          })
-          cancelarEdicionVideo()
-        } else {
-          setErroresVideo({
-            general: resultado.error || 'No se pudo actualizar el video o las preguntas.',
-          })
-        }
-      } else {
-        const resultado = agregarLeccionConVideo(cursoVideoId, moduloDestinoId, {
-          titulo: nuevoTituloLeccion.trim(),
-          duracion: duracionDetectada,
-          video: refVideo,
-          cuestionarios: cuestionariosFinales,
-        })
-
-        if (resultado.ok) {
-          setMensajeExitoVideo({
-            texto: `La nueva lección "${resultado.leccion.titulo}" fue creada con su video y ${cuestionariosFinales.length} checkpoints interactivos.`,
-            cursoId: cursoVideoId,
-            leccionId: resultado.leccion.id,
-          })
-          setNuevoTituloLeccion('')
-          cancelarEdicionVideo()
-        } else {
-          setErroresVideo({
-            general: resultado.error || 'No se pudo crear la nueva lección con el video.',
-          })
-        }
+      if (!res.ok) {
+        setErroresVideo({ general: res.error })
+        return
       }
-    } catch (error) {
-      setErroresVideo({
-        general: 'Error al almacenar el video: ' + (error.message || 'Error desconocido'),
-      })
+
+      setVideoActualReferencia(videoFinal)
+      setArchivoVideo(null)
+      if (previsualizacionUrl && previsualizacionUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previsualizacionUrl)
+      }
+      setPrevisualizacionUrl(null)
+      setMensajeExitoVideo(
+        modoAsignacion === 'existente'
+          ? `Lección actualizada en SQLite con ${cuestionariosPayload.length} preguntas.`
+          : `Nueva lección "${nuevoTituloLeccion.trim()}" creada con ${cuestionariosPayload.length} preguntas.`
+      )
+      if (modoAsignacion === 'nueva') {
+        setNuevoTituloLeccion('')
+        setCheckpoints([])
+        setCheckpointActivo(null)
+      }
+    } catch (err) {
+      setErroresVideo({ general: err.message || 'Error al guardar el video.' })
     } finally {
       setGuardandoVideo(false)
     }
   }
 
-  // Cursos filtrados para el catálogo
-  const cursosFiltrados = cursos.filter(
-    (c) =>
-      c.titulo.toLowerCase().includes(filtroTexto.toLowerCase()) ||
-      c.categoria.toLowerCase().includes(filtroTexto.toLowerCase())
-  )
+  // ==================== HANDLERS SOLICITUDES Y ACCESOS ====================
+  async function handleResolverSolicitud(id, estado) {
+    setMensajeAcceso('')
+    try {
+      await apiFetch(`/api/admin/solicitudes/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ estado }),
+      })
+      setMensajeAcceso(estado === 'aprobado' ? 'Acceso aprobado correctamente.' : 'Solicitud rechazada.')
+      await cargarSolicitudesYEstudiantes()
+    } catch (err) {
+      setMensajeAcceso(err.message)
+    }
+  }
 
-  const totalLeccionesCatalogo = cursos.reduce((acc, c) => acc + leccionesDe(c).length, 0)
+  async function handleOtorgarManual(e) {
+    e.preventDefault()
+    if (!manualUsuarioId || !manualCursoId) return
+    setMensajeAcceso('')
+    try {
+      await apiFetch('/api/admin/accesos/otorgar', {
+        method: 'POST',
+        body: JSON.stringify({
+          usuarioId: Number(manualUsuarioId),
+          cursoId: Number(manualCursoId),
+          estado: 'aprobado',
+        }),
+      })
+      setMensajeAcceso('Permiso otorgado correctamente al estudiante.')
+      await cargarSolicitudesYEstudiantes()
+    } catch (err) {
+      setMensajeAcceso(err.message)
+    }
+  }
 
-  // Cálculos dinámicos para la vista previa del curso en edición/creación
-  const totalLeccionesPreview = modulos.reduce((acc, m) => acc + m.lecciones.length, 0)
-  const totalSegundosPreview = modulos.reduce(
-    (acc, m) => acc + m.lecciones.reduce((lAcc, l) => lAcc + (Number(l.duracion) || 0), 0),
-    0
-  )
+  // ==================== HANDLERS USUARIOS (ADMIN GENERAL) ====================
+  async function handleCrearUsuario(e) {
+    e.preventDefault()
+    setMensajeUsuario('')
+    setErrorUsuario('')
+    try {
+      const res = await apiFetch('/api/admin/usuarios', {
+        method: 'POST',
+        body: JSON.stringify({
+          nombre: nuevoUserNombre.trim(),
+          username: nuevoUserUsername.trim().toLowerCase(),
+          email: nuevoUserEmail.trim() || null,
+          password: nuevoUserPassword.trim(),
+          rol: nuevoUserRol,
+        }),
+      })
+      setMensajeUsuario(`Cuenta "${res.usuario.username}" (${res.usuario.rol}) creada correctamente.`)
+      setNuevoUserNombre('')
+      setNuevoUserUsername('')
+      setNuevoUserEmail('')
+      setNuevoUserPassword('')
+      await cargarUsuarios()
+    } catch (err) {
+      setErrorUsuario(err.message || 'No se pudo crear el usuario.')
+    }
+  }
+
+  async function handleCambiarEstadoUsuario(u) {
+    setErrorUsuario('')
+    try {
+      await apiFetch(`/api/admin/usuarios/${u.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ activo: !u.activo }),
+      })
+      await cargarUsuarios()
+    } catch (err) {
+      setErrorUsuario(err.message)
+    }
+  }
+
+  const cursosFiltrados = cursos.filter((c) => {
+    const q = filtroTexto.trim().toLowerCase()
+    if (!q) return true
+    return (
+      c.titulo.toLowerCase().includes(q) ||
+      c.categoria.toLowerCase().includes(q) ||
+      c.descripcion.toLowerCase().includes(q)
+    )
+  })
+
+  const videoPreviewSrc = previsualizacionUrl || videoActualReferencia || ''
+  const solicitudesPendientes = solicitudes.filter((s) => s.estado === 'pendiente').length
+  const estudiantesLista = usuariosLista.filter((u) => u.rol === 'estudiante')
+  const cursosRestringidos = cursos.filter((c) => c.tipoAcceso === 'restringido')
 
   return (
     <div className="admin-layout">
-      {/* Barra superior de administración */}
       <header className="admin-header">
         <div className="admin-header-contenido">
           <div className="admin-marca">
             <span className="logo-punto"></span>
-            <span className="logo-texto">andén</span>
-            <span className="badge-admin">ADMIN</span>
+            andén
+            <span className="badge-admin">{esAdminGeneral ? 'ADMIN GENERAL' : 'PROFESOR'}</span>
           </div>
 
           <div className="admin-header-acciones">
-            <Link to="/" className="boton-enlace-estudiante" title="Ver catálogo como estudiante">
-              Ver portal de estudiante
+            <Link to="/cursos" className="boton-enlace-estudiante">
+              Ver vista estudiante
             </Link>
-
             <div className="admin-perfil">
               <span className="avatar avatar-admin">{usuarioActual?.iniciales || 'AD'}</span>
-              <span className="admin-nombre">{usuarioActual?.nombre || 'Administrador'}</span>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="boton-cerrar-sesion"
-                title="Cerrar sesión"
-              >
-                Cerrar sesión
-              </button>
+              <span className="admin-nombre">{usuarioActual?.nombre}</span>
             </div>
+            <button type="button" className="boton-cerrar-sesion" onClick={handleLogout}>
+              Salir
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Contenido principal de administración */}
-      <main className="contenedor admin-principal">
-        <div className="encabezado admin-encabezado">
-          <div>
-            <h1>Panel de Administración</h1>
-            <p className="texto-suave">
-              Gestiona los cursos, contenidos y recursos educativos de Andén.
-            </p>
-          </div>
-
-          {/* Estadísticas rápidas */}
-          <div className="admin-resumen-tarjetas">
-            <div className="tarjeta-resumen">
-              <span className="resumen-numero">{cursos.length}</span>
-              <span className="resumen-etiqueta">Cursos en total</span>
-            </div>
-            <div className="tarjeta-resumen">
-              <span className="resumen-numero">{totalLeccionesCatalogo}</span>
-              <span className="resumen-etiqueta">Lecciones activas</span>
-            </div>
-          </div>
+      <main className="admin-contenedor">
+        <div className="admin-encabezado-pagina">
+          <h1>{esAdminGeneral ? 'Panel de Administración General' : 'Panel de Profesor'}</h1>
+          <p className="texto-suave">
+            Gestiona cursos, prelaciones, videos con checkpoints interactivos en la línea de tiempo y permisos de acceso.
+          </p>
         </div>
 
-        {/* Pestañas de navegación de administración */}
         <div className="admin-tabs" role="tablist">
           <button
             type="button"
@@ -695,9 +809,8 @@ function Admin() {
             className={`admin-tab ${pestanaActiva === 'cursos' ? 'activa' : ''}`}
             onClick={() => setPestanaActiva('cursos')}
           >
-            Gestión de Cursos
+            Cursos ({cursos.length})
           </button>
-
           <button
             type="button"
             role="tab"
@@ -705,953 +818,675 @@ function Admin() {
             className={`admin-tab ${pestanaActiva === 'videos' ? 'activa' : ''}`}
             onClick={() => setPestanaActiva('videos')}
           >
-            Gestión de Videos y Preguntas
+            Videos y Checkpoints
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pestanaActiva === 'solicitudes'}
+            className={`admin-tab ${pestanaActiva === 'solicitudes' ? 'activa' : ''}`}
+            onClick={() => setPestanaActiva('solicitudes')}
+          >
+            Solicitudes y Accesos {solicitudesPendientes > 0 ? `(${solicitudesPendientes})` : ''}
+          </button>
+          {esAdminGeneral && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={pestanaActiva === 'usuarios'}
+              className={`admin-tab ${pestanaActiva === 'usuarios' ? 'activa' : ''}`}
+              onClick={() => setPestanaActiva('usuarios')}
+            >
+              Usuarios y Roles
+            </button>
+          )}
         </div>
 
-        {/* ============================================================== */}
-        {/* SECCIÓN 1: GESTIÓN DE CURSOS (CREAR Y EDITAR)                  */}
-        {/* ============================================================== */}
+        {/* ==================== PESTAÑA 1: CURSOS ==================== */}
         {pestanaActiva === 'cursos' && (
-          <div className="admin-panel-cursos">
-            {mensajeExito && (
-              <div className="alerta-exito" role="alert">
-                <span>{mensajeExito}</span>
-                <button
-                  type="button"
-                  className="boton-cerrar-alerta"
-                  onClick={() => setMensajeExito('')}
-                >
-                  Cerrar
-                </button>
-              </div>
-            )}
+          <div className="admin-grid">
+            <section ref={seccionFormularioCursoRef} className="admin-tarjeta">
+              <h2>{cursoEditandoId ? 'Editar curso' : 'Agregar nuevo curso'}</h2>
 
-            <div className="admin-grid">
-              {/* Formulario para agregar / editar curso */}
-              <section
-                className="admin-seccion-formulario"
-                ref={seccionFormularioCursoRef}
-                id="seccion-formulario-curso"
-              >
-                <div className="formulario-cabecera">
-                  <div className="formulario-titulo-acciones">
-                    <h2>{cursoEditandoId ? 'Editar curso' : 'Agregar nuevo curso'}</h2>
-                    {cursoEditandoId && (
-                      <button
-                        type="button"
-                        className="boton boton-claro boton-cancelar-edicion"
-                        onClick={cancelarEdicionCurso}
-                      >
-                        Cancelar edición
-                      </button>
-                    )}
-                  </div>
-                  <p className="texto-suave">
-                    {cursoEditandoId
-                      ? `Modificando los datos y contenidos del curso (ID: ${cursoEditandoId}).`
-                      : 'Define la información general y agrega los módulos y lecciones que desees.'}
-                  </p>
+              {mensajeExito && <div className="alerta-exito">{mensajeExito}</div>}
+              {errores.general && <div className="alerta-error">{errores.general}</div>}
+
+              <form onSubmit={handleGuardarCurso} className="admin-formulario">
+                <div className="campo-grupo">
+                  <label htmlFor="curso-titulo" className="campo-etiqueta">Título del curso *</label>
+                  <input
+                    id="curso-titulo"
+                    type="text"
+                    className={`campo-input ${errores.titulo ? 'con-error' : ''}`}
+                    value={titulo}
+                    onChange={(e) => setTitulo(e.target.value)}
+                    placeholder="Ej: JavaScript moderno"
+                  />
+                  {errores.titulo && <span className="campo-mensaje-error">{errores.titulo}</span>}
                 </div>
 
-                <form onSubmit={handleGuardarCurso} className="formulario-admin" noValidate>
-                  {errores.general && (
-                    <div className="alerta-error" role="alert">
-                      <span>{errores.general}</span>
-                    </div>
-                  )}
+                <div className="admin-form-fila">
+                  <div className="campo-grupo">
+                    <label htmlFor="curso-categoria" className="campo-etiqueta">Categoría</label>
+                    <select
+                      id="curso-categoria"
+                      className="campo-input"
+                      value={categoria}
+                      onChange={(e) => cambiarCategoria(e.target.value)}
+                    >
+                      <option value="Programación">Programación</option>
+                      <option value="Diseño">Diseño</option>
+                      <option value="Datos">Datos</option>
+                      <option value="otra">Otra categoría…</option>
+                    </select>
+                  </div>
 
                   <div className="campo-grupo">
-                    <div className="campo-etiqueta-fila">
-                      <label htmlFor="curso-titulo" className="campo-etiqueta">
-                        Título del curso *
-                      </label>
-                      <span className={`campo-contador ${titulo.length >= 40 ? 'limite-alcanzado' : ''}`}>
-                        {titulo.length}/40
-                      </span>
-                    </div>
+                    <label htmlFor="curso-nivel" className="campo-etiqueta">Nivel</label>
+                    <select
+                      id="curso-nivel"
+                      className="campo-input"
+                      value={nivel}
+                      onChange={(e) => setNivel(e.target.value)}
+                    >
+                      <option value="Principiante">Principiante</option>
+                      <option value="Intermedio">Intermedio</option>
+                      <option value="Avanzado">Avanzado</option>
+                    </select>
+                  </div>
+                </div>
+
+                {categoria === 'otra' && (
+                  <div className="campo-grupo">
+                    <label htmlFor="curso-cat-custom" className="campo-etiqueta">Nombre de la categoría *</label>
                     <input
-                      id="curso-titulo"
+                      id="curso-cat-custom"
                       type="text"
-                      maxLength={40}
-                      className={`campo-input ${errores.titulo ? 'con-error' : ''}`}
-                      placeholder="Ej: Fundamentos de TypeScript"
-                      value={titulo}
-                      onChange={(e) => {
-                        setTitulo(e.target.value)
-                        if (errores.titulo) setErrores((prev) => ({ ...prev, titulo: '' }))
-                      }}
+                      className="campo-input"
+                      value={categoriaPersonalizada}
+                      onChange={(e) => setCategoriaPersonalizada(e.target.value)}
+                      placeholder="Ej: Seguridad Informática"
                     />
-                    {errores.titulo && (
-                      <span className="campo-mensaje-error">{errores.titulo}</span>
-                    )}
                   </div>
+                )}
 
-                  <div className="admin-form-fila">
-                    <div className="campo-grupo">
-                      <label htmlFor="curso-categoria" className="campo-etiqueta">
-                        Categoría
-                      </label>
-                      <select
-                        id="curso-categoria"
-                        className="campo-input"
-                        value={categoria}
-                        onChange={(e) => setCategoria(e.target.value)}
-                      >
-                        <option value="Programación">Programación</option>
-                        <option value="Diseño">Diseño</option>
-                        <option value="Datos">Datos</option>
-                        <option value="DevOps">DevOps</option>
-                        <option value="Otra">Otra...</option>
-                      </select>
-                      {categoria === 'Otra' && (
-                        <input
-                          type="text"
-                          className="campo-input campo-extra"
-                          placeholder="Escribe la categoría"
-                          value={categoriaPersonalizada}
-                          onChange={(e) => setCategoriaPersonalizada(e.target.value)}
-                        />
-                      )}
-                    </div>
+                <div className="campo-grupo">
+                  <label htmlFor="curso-desc" className="campo-etiqueta">Descripción *</label>
+                  <textarea
+                    id="curso-desc"
+                    rows="2"
+                    className={`campo-input campo-textarea ${errores.descripcion ? 'con-error' : ''}`}
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    placeholder="Qué aprenderá el estudiante en este curso…"
+                  />
+                  {errores.descripcion && <span className="campo-mensaje-error">{errores.descripcion}</span>}
+                </div>
 
-                    <div className="campo-grupo">
-                      <label htmlFor="curso-nivel" className="campo-etiqueta">
-                        Nivel de dificultad
-                      </label>
-                      <select
-                        id="curso-nivel"
-                        className="campo-input"
-                        value={nivel}
-                        onChange={(e) => setNivel(e.target.value)}
-                      >
-                        <option value="Principiante">Principiante</option>
-                        <option value="Intermedio">Intermedio</option>
-                        <option value="Avanzado">Avanzado</option>
-                      </select>
-                    </div>
-                  </div>
-
+                <div className="admin-form-fila">
                   <div className="campo-grupo">
-                    <label className="campo-etiqueta">Color de la línea de metro</label>
-                    <div className="selector-colores">
-                      {PALETA_COLORES.map((c) => (
-                        <button
-                          key={c.hex}
-                          type="button"
-                          className={`muestra-color ${color === c.hex ? 'seleccionado' : ''}`}
-                          style={{ backgroundColor: c.hex }}
-                          title={c.nombre}
-                          aria-label={c.nombre}
-                          onClick={() => setColor(c.hex)}
-                        />
-                      ))}
+                    <label htmlFor="curso-acceso" className="campo-etiqueta">Tipo de acceso</label>
+                    <select
+                      id="curso-acceso"
+                      className="campo-input"
+                      value={tipoAcceso}
+                      onChange={(e) => setTipoAcceso(e.target.value)}
+                    >
+                      <option value="gratis">Gratis (abierto a todos)</option>
+                      <option value="restringido">Restringido (permiso admin / pago simulado)</option>
+                    </select>
+                  </div>
+
+                  {tipoAcceso === 'restringido' && (
+                    <div className="campo-grupo">
+                      <label htmlFor="curso-precio" className="campo-etiqueta">Precio simulado (USD)</label>
                       <input
-                        type="color"
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        className="color-custom-picker"
-                        title="Elegir otro color"
-                        aria-label="Elegir otro color"
+                        id="curso-precio"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="campo-input"
+                        value={precio}
+                        onChange={(e) => setPrecio(e.target.value)}
                       />
                     </div>
+                  )}
+                </div>
+
+                <div className="admin-form-fila">
+                  <div className="campo-grupo">
+                    <label htmlFor="curso-prereq" className="campo-etiqueta">
+                      Prelación / curso prerrequisito (opcional)
+                    </label>
+                    <select
+                      id="curso-prereq"
+                      className="campo-input"
+                      value={prerequisitoCursoId}
+                      onChange={(e) => setPrerequisitoCursoId(e.target.value)}
+                    >
+                      <option value="">Ninguno (acceso sin prelación)</option>
+                      {cursos
+                        .filter((c) => c.id !== cursoEditandoId)
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.titulo} ({c.categoria})
+                          </option>
+                        ))}
+                    </select>
                   </div>
 
                   <div className="campo-grupo">
-                    <div className="campo-etiqueta-fila">
-                      <label htmlFor="curso-descripcion" className="campo-etiqueta">
-                        Descripción del curso *
-                      </label>
-                      <span className={`campo-contador ${descripcion.length >= 200 ? 'limite-alcanzado' : ''}`}>
-                        {descripcion.length}/200
-                      </span>
-                    </div>
-                    <textarea
-                      id="curso-descripcion"
-                      rows={3}
-                      maxLength={200}
-                      className={`campo-input campo-textarea ${
-                        errores.descripcion ? 'con-error' : ''
-                      }`}
-                      placeholder="Breve resumen de los contenidos y habilidades que se adquirirán..."
-                      value={descripcion}
-                      onChange={(e) => {
-                        setDescripcion(e.target.value)
-                        if (errores.descripcion)
-                          setErrores((prev) => ({ ...prev, descripcion: '' }))
-                      }}
+                    <label htmlFor="curso-umbral" className="campo-etiqueta">
+                      % mínimo de aciertos para certificado
+                    </label>
+                    <input
+                      id="curso-umbral"
+                      type="number"
+                      min="10"
+                      max="100"
+                      className="campo-input"
+                      value={umbralCertificado}
+                      onChange={(e) => setUmbralCertificado(e.target.value)}
                     />
-                    {errores.descripcion && (
-                      <span className="campo-mensaje-error">{errores.descripcion}</span>
-                    )}
+                  </div>
+                </div>
+
+                <div className="campo-grupo">
+                  <span className="campo-etiqueta">Color y ambiente del curso (afecta línea, fondo y reproductor)</span>
+                  <div className="paleta-colores">
+                    {PALETA_COLORES.map((item) => (
+                      <button
+                        key={item.hex}
+                        type="button"
+                        className={`color-opcion ${color === item.hex ? 'activo' : ''}`}
+                        style={{ backgroundColor: item.hex }}
+                        title={item.nombre}
+                        onClick={() => setColor(item.hex)}
+                        aria-label={item.nombre}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      title="Elegir color personalizado"
+                      className="color-picker-nativo"
+                    />
+                  </div>
+                </div>
+
+                <div className="campo-grupo">
+                  <div className="seccion-subcabecera">
+                    <h3>Módulos y lecciones</h3>
+                    <button type="button" className="boton boton-claro" onClick={agregarModulo}>
+                      + Módulo
+                    </button>
                   </div>
 
-                  {/* ============================================================== */}
-                  {/* CONSTRUCTOR DE MÓDULOS Y LECCIONES CON BOTÓN '+'              */}
-                  {/* ============================================================== */}
-                  <div className="bloque-modulos-constructor">
-                    <div className="seccion-subcabecera">
-                      <div>
-                        <h3>Módulos y lecciones del curso</h3>
-                        <p className="texto-suave">
-                          Agrega los módulos que desees y dentro de cada uno las lecciones correspondientes.
-                        </p>
+                  {modulos.map((m, mIdx) => (
+                    <div key={mIdx} className="modulo-editor-caja">
+                      <div className="modulo-editor-cabecera">
+                        <input
+                          type="text"
+                          className="campo-input"
+                          value={m.titulo}
+                          onChange={(e) => cambiarTituloModulo(mIdx, e.target.value)}
+                          placeholder="Título del módulo"
+                        />
+                        {modulos.length > 1 && (
+                          <button
+                            type="button"
+                            className="boton-eliminar-item"
+                            onClick={() => eliminarModulo(mIdx)}
+                          >
+                            Quitar
+                          </button>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        className="boton boton-claro boton-agregar-modulo"
-                        onClick={agregarModulo}
-                      >
-                        + Agregar módulo
-                      </button>
-                    </div>
 
-                    <div className="modulos-lista">
-                      {modulos.map((m, mIdx) => (
-                        <div key={m.id || mIdx} className="modulo-card">
-                          <div className="modulo-card-header">
-                            <span className="modulo-badge-numero">Módulo {mIdx + 1}</span>
-                            <div className="modulo-input-box">
-                              <input
-                                type="text"
-                                className={`campo-input ${
-                                  errores[`modulo_${mIdx}`] ? 'con-error' : ''
-                                }`}
-                                placeholder="Título del módulo"
-                                value={m.titulo}
-                                onChange={(e) => cambiarTituloModulo(mIdx, e.target.value)}
-                              />
-                              {errores[`modulo_${mIdx}`] && (
-                                <span className="campo-mensaje-error">
-                                  {errores[`modulo_${mIdx}`]}
-                                </span>
-                              )}
-                            </div>
-                            {modulos.length > 1 && (
-                              <button
-                                type="button"
-                                className="boton-eliminar-item"
-                                title="Eliminar este módulo"
-                                onClick={() => eliminarModulo(mIdx)}
-                              >
-                                Eliminar módulo
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Lista de lecciones del módulo */}
-                          <div className="lecciones-lista-modulo">
-                            <span className="lecciones-titulo-guia">
-                              Lecciones de este módulo:
-                            </span>
-
-                            {m.lecciones.map((l, lIdx) => (
-                              <div key={l.id || lIdx} className="leccion-fila-item">
-                                <span className="leccion-indice">{lIdx + 1}.</span>
-                                <div className="leccion-input-titulo-box">
-                                  <input
-                                    type="text"
-                                    className={`campo-input ${
-                                      errores[`leccion_${mIdx}_${lIdx}`] ? 'con-error' : ''
-                                    }`}
-                                    placeholder="Título de la lección"
-                                    value={l.titulo}
-                                    onChange={(e) =>
-                                      cambiarLeccion(mIdx, lIdx, 'titulo', e.target.value)
-                                    }
-                                  />
-                                  {errores[`leccion_${mIdx}_${lIdx}`] && (
-                                    <span className="campo-mensaje-error">
-                                      {errores[`leccion_${mIdx}_${lIdx}`]}
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="leccion-duracion-box">
-                                  <input
-                                    type="number"
-                                    min="10"
-                                    className="campo-input input-segundos"
-                                    title="Duración en segundos"
-                                    value={l.duracion}
-                                    onChange={(e) =>
-                                      cambiarLeccion(mIdx, lIdx, 'duracion', e.target.value)
-                                    }
-                                  />
-                                  <span className="texto-suave">seg</span>
-                                </div>
-
-                                {m.lecciones.length > 1 && (
-                                  <button
-                                    type="button"
-                                    className="boton-eliminar-item"
-                                    title="Quitar esta lección"
-                                    onClick={() => eliminarLeccion(mIdx, lIdx)}
-                                  >
-                                    Quitar
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-
+                      {m.lecciones.map((l, lIdx) => (
+                        <div key={lIdx} className="leccion-editor-fila">
+                          <input
+                            type="text"
+                            className="campo-input"
+                            value={l.titulo}
+                            onChange={(e) => cambiarLeccion(mIdx, lIdx, 'titulo', e.target.value)}
+                            placeholder="Título de lección"
+                          />
+                          <input
+                            type="number"
+                            min="5"
+                            className="campo-input input-duracion-mini"
+                            value={l.duracion}
+                            onChange={(e) => cambiarLeccion(mIdx, lIdx, 'duracion', Number(e.target.value))}
+                            title="Duración en segundos"
+                          />
+                          {m.lecciones.length > 1 && (
                             <button
                               type="button"
-                              className="boton-texto-mas"
-                              onClick={() => agregarLeccion(mIdx)}
+                              className="boton-quitar-opcion"
+                              onClick={() => eliminarLeccion(mIdx, lIdx)}
                             >
-                              + Agregar lección
+                              ×
                             </button>
-                          </div>
+                          )}
                         </div>
                       ))}
-                    </div>
-                  </div>
 
-                  <div className="botones-formulario-curso">
-                    <button type="submit" className="boton boton-crear-curso">
-                      {cursoEditandoId ? 'Guardar cambios del curso' : 'Publicar curso en Andén'}
-                    </button>
-                    {cursoEditandoId && (
                       <button
                         type="button"
-                        className="boton boton-claro"
-                        onClick={cancelarEdicionCurso}
+                        className="boton-texto-mas"
+                        onClick={() => agregarLeccion(mIdx)}
                       >
-                        Cancelar
+                        + Agregar lección
                       </button>
-                    )}
-                  </div>
-                </form>
-              </section>
+                    </div>
+                  ))}
+                </div>
 
-              {/* Vista previa en tiempo real */}
-              <aside className="admin-seccion-preview">
-                <h2>Vista previa</h2>
-                <p className="texto-suave">Aspecto del curso en el catálogo general:</p>
+                <div className="botones">
+                  <button type="submit" className="boton" disabled={guardandoCurso}>
+                    {guardandoCurso ? 'Guardando…' : cursoEditandoId ? 'Guardar cambios' : 'Crear curso'}
+                  </button>
+                  {cursoEditandoId && (
+                    <button type="button" className="boton boton-claro" onClick={cancelarEdicionCurso}>
+                      Cancelar edición
+                    </button>
+                  )}
+                </div>
+              </form>
+            </section>
 
-                <article
-                  className="admin-preview-tarjeta"
-                  style={{ '--color-linea': color }}
-                >
-                  <div className="preview-tarjeta-cuerpo">
-                    <span className="insignia">{cursoEditandoId || cursos.length + 1}</span>
-                    <div className="preview-tarjeta-info">
+            <section className="admin-columna-derecha">
+              <div className="admin-tarjeta" style={{ '--color-linea': color }}>
+                <h2>Vista previa del tema</h2>
+                <div className="preview-tema-curso">
+                  <div className="preview-tema-encabezado">
+                    <span className="insignia" style={{ background: color }}>
+                      {cursoEditandoId || cursos.length + 1}
+                    </span>
+                    <div>
                       <h3>{titulo.trim() || 'Título del curso'}</h3>
                       <p className="texto-suave">
-                        {descripcion.trim() ||
-                          'Aquí se mostrará la descripción detallada del curso para los alumnos.'}
-                      </p>
-                      <p className="meta">
-                        {categoria === 'Otra'
-                          ? categoriaPersonalizada.trim() || 'General'
-                          : categoria}{' '}
-                        · {nivel} · {totalLeccionesPreview} lecciones (~
-                        {Math.ceil(totalSegundosPreview / 60)} min)
+                        {categoria === 'otra' ? categoriaPersonalizada || 'Categoría' : categoria} · {nivel} ·{' '}
+                        {tipoAcceso === 'gratis' ? 'Gratis' : `Restringido ($${Number(precio || 0).toFixed(2)})`}
                       </p>
                     </div>
                   </div>
-
-                  <div className="preview-tarjeta-pie">
-                    <div className="fila-curso-progreso">
-                      <span>0%</span>
-                      <BarraProgreso porcentaje={0} />
-                    </div>
-                    <span className="boton boton-claro">Empezar</span>
-                  </div>
-                </article>
-              </aside>
-            </div>
-
-            {/* Listado de cursos con opciones de Editar y Eliminar */}
-            <section className="admin-seccion-catalogo">
-              <div className="catalogo-cabecera">
-                <div>
-                  <h2>Cursos actuales en la plataforma ({cursos.length})</h2>
-                  <p className="texto-suave">
-                    Visualiza, edita o gestiona los cursos disponibles en la red de aprendizaje.
-                  </p>
+                  <BarraProgreso porcentaje={45} />
                 </div>
-                <input
-                  type="search"
-                  className="campo-input admin-buscador"
-                  placeholder="Buscar curso por título o categoría..."
-                  value={filtroTexto}
-                  onChange={(e) => setFiltroTexto(e.target.value)}
-                />
               </div>
 
-              <div className="lista-cursos">
-                {cursosFiltrados.map((c) => {
-                  const cantLecciones = leccionesDe(c).length
-                  const cantModulos = c.modulos?.length || 1
-                  return (
-                    <article
-                      key={c.id}
-                      className="fila-curso"
-                      style={{ '--color-linea': c.color }}
-                    >
-                      <span className="insignia">{c.id}</span>
+              <div className="admin-tarjeta">
+                <div className="seccion-subcabecera">
+                  <h2>Cursos actuales ({cursos.length})</h2>
+                  <input
+                    type="search"
+                    className="campo-input input-busqueda-mini"
+                    placeholder="Buscar curso…"
+                    value={filtroTexto}
+                    onChange={(e) => setFiltroTexto(e.target.value)}
+                  />
+                </div>
 
+                <div className="admin-lista-cursos">
+                  {cursosFiltrados.map((c) => (
+                    <div key={c.id} className="admin-curso-item" style={{ '--color-linea': c.color }}>
                       <div>
-                        <h3>
-                          {c.titulo}
-                          {c.esNuevo && <span className="tag-nuevo">Nuevo</span>}
-                        </h3>
-                        <p className="texto-suave">{c.descripcion}</p>
-                        <p className="meta">
-                          {c.categoria}, {c.nivel}, {cantModulos}{' '}
-                          {cantModulos === 1 ? 'módulo' : 'módulos'}, {cantLecciones}{' '}
-                          {cantLecciones === 1 ? 'lección' : 'lecciones'}
+                        <div className="admin-curso-titulo-row">
+                          <span className="rama-color" style={{ background: c.color }} />
+                          <strong>{c.titulo}</strong>
+                          <span className={`etiqueta-acceso ${c.tipoAcceso === 'gratis' ? 'gratis' : 'restringido'}`}>
+                            {c.tipoAcceso === 'gratis' ? 'Gratis' : `$${(c.precio || 0).toFixed(2)}`}
+                          </span>
+                        </div>
+                        <p className="texto-suave">
+                          {c.categoria} · {leccionesDe(c).length} lecciones · Cert. ≥ {c.umbralCertificado}%
+                          {c.prerequisitoTitulo ? ` · Requiere: ${c.prerequisitoTitulo}` : ''}
                         </p>
                       </div>
 
-                      <div className="admin-acciones-curso">
+                      <div className="admin-curso-acciones">
+                        <button type="button" className="boton boton-claro" onClick={() => iniciarEdicionCurso(c)}>
+                          Editar
+                        </button>
                         <button
                           type="button"
                           className="boton boton-claro"
-                          onClick={() => iniciarEdicionCurso(c)}
+                          onClick={() => {
+                            setCursoVideoId(c.id)
+                            setModoAsignacion('existente')
+                            const primera = leccionesDe(c)[0]
+                            if (primera) cargarLeccionEnEditor(primera)
+                            setPestanaActiva('videos')
+                          }}
                         >
-                          Editar curso
+                          Videos
                         </button>
-                        <Link to={'/aula/' + c.id} className="boton boton-claro">
-                          Ver en aula
-                        </Link>
-                        <button
-                          type="button"
-                          className="boton boton-claro boton-peligro-borde"
-                          onClick={() => handleEliminarCurso(c.id, c.titulo)}
-                        >
-                          Eliminar
-                        </button>
+                        {confirmandoEliminarId === c.id ? (
+                          <button
+                            type="button"
+                            className="boton-eliminar-item"
+                            onClick={() => handleConfirmarEliminar(c.id)}
+                          >
+                            Confirmar
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="boton-eliminar-item"
+                            onClick={() => setConfirmandoEliminarId(c.id)}
+                          >
+                            Eliminar
+                          </button>
+                        )}
                       </div>
-                    </article>
-                  )
-                })}
-
-                {cursosFiltrados.length === 0 && (
-                  <p className="mensaje-vacio">No se encontraron cursos con ese criterio.</p>
-                )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
           </div>
         )}
 
-        {/* ============================================================== */}
-        {/* SECCIÓN 2: GESTIÓN DE VIDEOS Y PREGUNTAS (FUNCIONAL)          */}
-        {/* ============================================================== */}
+        {/* ==================== PESTAÑA 2: VIDEOS Y CHECKPOINTS ==================== */}
         {pestanaActiva === 'videos' && (
-          <div className="admin-panel-videos">
-            {mensajeExitoVideo && (
-              <div className="alerta-exito" role="alert">
-                <div className="alerta-exito-texto">
-                  <p>
-                    <strong>{mensajeExitoVideo.texto}</strong>
-                  </p>
-                </div>
-                <div className="alerta-exito-acciones">
-                  <Link
-                    to={`/aula/${mensajeExitoVideo.cursoId}/${mensajeExitoVideo.leccionId}`}
-                    className="boton boton-claro"
+          <div ref={seccionSubidaRef} className="admin-tarjeta">
+            <h2>Editor de Videos y Checkpoints Interactivos</h2>
+            <p className="texto-suave" style={{ marginBottom: '16px' }}>
+              Sube un video al servidor o edita una lección existente. Usa la barra interactiva para colocar o arrastrar cada pregunta al segundo exacto.
+            </p>
+
+            {mensajeExitoVideo && <div className="alerta-exito">{mensajeExitoVideo}</div>}
+            {erroresVideo.general && <div className="alerta-error">{erroresVideo.general}</div>}
+
+            <form onSubmit={handleGuardarVideoYCheckpoints} className="admin-formulario">
+              <div className="admin-form-fila">
+                <div className="campo-grupo">
+                  <label htmlFor="video-curso-select" className="campo-etiqueta">Curso *</label>
+                  <select
+                    id="video-curso-select"
+                    className="campo-input"
+                    value={cursoVideoId}
+                    onChange={(e) => {
+                      const nuevoCursoId = Number(e.target.value)
+                      setCursoVideoId(nuevoCursoId)
+                      const c = cursos.find((x) => x.id === nuevoCursoId)
+                      const primera = c ? leccionesDe(c)[0] : null
+                      if (primera && modoAsignacion === 'existente') cargarLeccionEnEditor(primera)
+                    }}
                   >
-                    Ver en aula
-                  </Link>
-                  <button
-                    type="button"
-                    className="boton-cerrar-alerta"
-                    onClick={() => setMensajeExitoVideo(null)}
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {erroresVideo.general && (
-              <div className="alerta-error" role="alert">
-                <span>{erroresVideo.general}</span>
-              </div>
-            )}
-
-            <div className="admin-grid">
-              {/* Formulario de subida y edición de video */}
-              <section className="admin-seccion-formulario" ref={seccionSubidaRef}>
-                <div className="formulario-cabecera">
-                  <div className="formulario-titulo-acciones">
-                    <h2>
-                      {editandoVideoLeccionId
-                        ? 'Editar video y preguntas de lección'
-                        : 'Cargar video de lección'}
-                    </h2>
-                    {editandoVideoLeccionId && (
-                      <button
-                        type="button"
-                        className="boton boton-claro boton-cancelar-edicion"
-                        onClick={cancelarEdicionVideo}
-                      >
-                        Cancelar edición
-                      </button>
-                    )}
-                  </div>
-                  <p className="texto-suave">
-                    {editandoVideoLeccionId
-                      ? `Modificando la grabación y preguntas de la lección ID ${editandoVideoLeccionId}.`
-                      : 'Sube un archivo de video, vincúlalo a una lección y programa preguntas interactivas en el segundo exacto.'}
-                  </p>
+                    {cursos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.titulo} ({c.categoria})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                <form onSubmit={handleSubirVideo} className="formulario-admin" noValidate>
-                  {/* Selector de archivo / Drag and Drop */}
-                  <div className="campo-grupo">
-                    <label className="campo-etiqueta">
-                      Archivo de video {editandoVideoLeccionId ? '(opcional si conservas el actual)' : '*'}
+                <div className="campo-grupo">
+                  <label className="campo-etiqueta">Destino del video</label>
+                  <div className="selector-modo-asignacion">
+                    <label className={`modo-opcion ${modoAsignacion === 'existente' ? 'activo' : ''}`}>
+                      <input
+                        type="radio"
+                        name="modo-video"
+                        checked={modoAsignacion === 'existente'}
+                        onChange={() => setModoAsignacion('existente')}
+                      />
+                      <span>Editar lección existente</span>
                     </label>
+                    <label className={`modo-opcion ${modoAsignacion === 'nueva' ? 'activo' : ''}`}>
+                      <input
+                        type="radio"
+                        name="modo-video"
+                        checked={modoAsignacion === 'nueva'}
+                        onChange={() => {
+                          setModoAsignacion('nueva')
+                          setCheckpoints([])
+                          setCheckpointActivo(null)
+                          setVideoActualReferencia('')
+                        }}
+                      />
+                      <span>Crear nueva lección</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {modoAsignacion === 'existente' ? (
+                <div className="campo-grupo">
+                  <label htmlFor="video-leccion-select" className="campo-etiqueta">Lección *</label>
+                  <select
+                    id="video-leccion-select"
+                    className="campo-input"
+                    value={leccionVideoId}
+                    onChange={(e) => {
+                      const l = leccionesCursoVideo.find((x) => x.id === Number(e.target.value))
+                      if (l) cargarLeccionEnEditor(l)
+                    }}
+                  >
+                    {leccionesCursoVideo.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.id}: {l.titulo} ({formatoTiempo(l.duracion)} · {(l.cuestionarios || []).length} preguntas)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="admin-form-fila">
+                  <div className="campo-grupo">
+                    <label htmlFor="nueva-lecc-titulo" className="campo-etiqueta">Título de la nueva lección *</label>
                     <input
-                      ref={inputFileRef}
-                      type="file"
-                      accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) procesarArchivoVideo(e.target.files[0])
-                      }}
-                    />
-
-                    {!archivoVideo ? (
-                      <div
-                        className={`dropzone-video ${arrastrando ? 'arrastrando' : ''} ${
-                          erroresVideo.archivo ? 'con-error' : ''
-                        }`}
-                        onClick={() => inputFileRef.current?.click()}
-                        onDragOver={(e) => {
-                          e.preventDefault()
-                          setArrastrando(true)
-                        }}
-                        onDragLeave={() => setArrastrando(false)}
-                        onDrop={(e) => {
-                          e.preventDefault()
-                          setArrastrando(false)
-                          if (e.dataTransfer.files?.[0]) {
-                            procesarArchivoVideo(e.dataTransfer.files[0])
-                          }
-                        }}
-                        tabIndex={0}
-                        role="button"
-                        aria-label="Seleccionar o arrastrar archivo de video"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            inputFileRef.current?.click()
-                          }
-                        }}
-                      >
-                        <p className="dropzone-texto-principal">
-                          {videoActualReferencia
-                            ? 'Arrastra un nuevo video si deseas reemplazar el actual'
-                            : 'Arrastra y suelta aquí tu archivo de video (.mp4, .webm, .ogg)'}
-                        </p>
-                        <p className="texto-suave">o haz clic para examinar tu equipo</p>
-                        {videoActualReferencia && (
-                          <span className="tag-archivo-actual">
-                            Video actual: {videoActualReferencia}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="video-cargado-resumen">
-                        <div className="video-cargado-detalles">
-                          <div>
-                            <strong>{archivoVideo.name}</strong>
-                            <p className="texto-suave">
-                              {(archivoVideo.size / (1024 * 1024)).toFixed(1)} MB · Duración
-                              estimada: {formatoTiempo(duracionDetectada)}
-                            </p>
-                          </div>
-                          <div className="video-cargado-acciones">
-                            <button
-                              type="button"
-                              className="boton-enlace"
-                              onClick={() => inputFileRef.current?.click()}
-                            >
-                              Cambiar video
-                            </button>
-                            <button
-                              type="button"
-                              className="boton-enlace boton-peligro"
-                              onClick={quitarArchivoVideo}
-                            >
-                              Quitar
-                            </button>
-                          </div>
-                        </div>
-
-                        {previsualizacionUrl && (
-                          <div className="admin-video-preview-wrapper">
-                            <video
-                              ref={previewVideoRef}
-                              src={previsualizacionUrl}
-                              controls
-                              className="admin-video-preview-player"
-                              preload="metadata"
-                              onLoadedMetadata={(e) => {
-                                if (e.target.duration && !isNaN(e.target.duration)) {
-                                  const seg = Math.round(e.target.duration)
-                                  if (seg > 0) setDuracionDetectada(seg)
-                                }
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {erroresVideo.archivo && (
-                      <span className="campo-mensaje-error">{erroresVideo.archivo}</span>
-                    )}
-                  </div>
-
-                  {/* Selección de curso */}
-                  <div className="campo-grupo">
-                    <label htmlFor="video-curso-select" className="campo-etiqueta">
-                      Curso de destino *
-                    </label>
-                    <select
-                      id="video-curso-select"
+                      id="nueva-lecc-titulo"
+                      type="text"
                       className="campo-input"
-                      value={cursoVideoId}
-                      onChange={(e) => {
-                        setCursoVideoId(Number(e.target.value))
-                        setLeccionVideoId('')
-                        if (erroresVideo.curso) {
-                          setErroresVideo((prev) => ({ ...prev, curso: '' }))
-                        }
-                      }}
+                      value={nuevoTituloLeccion}
+                      onChange={(e) => setNuevoTituloLeccion(e.target.value)}
+                      placeholder="Ej: Consultas JOIN en SQL"
+                    />
+                  </div>
+                  <div className="campo-grupo">
+                    <label htmlFor="nueva-lecc-mod" className="campo-etiqueta">Módulo</label>
+                    <select
+                      id="nueva-lecc-mod"
+                      className="campo-input"
+                      value={moduloDestinoId}
+                      onChange={(e) => setModuloDestinoId(Number(e.target.value))}
                     >
-                      {cursos.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          Línea {c.id}: {c.titulo} ({c.categoria})
-                        </option>
+                      {modulosCursoVideo.map((m) => (
+                        <option key={m.id} value={m.id}>{m.titulo}</option>
                       ))}
                     </select>
-                    {erroresVideo.curso && (
-                      <span className="campo-mensaje-error">{erroresVideo.curso}</span>
-                    )}
                   </div>
+                </div>
+              )}
 
-                  {/* Modo de asignación: Lección existente vs Nueva lección */}
-                  <div className="campo-grupo">
-                    <label className="campo-etiqueta">Destino del video</label>
-                    <div className="selector-modo-asignacion">
-                      <label
-                        className={`modo-opcion ${
-                          modoAsignacion === 'existente' ? 'activo' : ''
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="modo-asignacion"
-                          value="existente"
-                          checked={modoAsignacion === 'existente'}
-                          onChange={() => setModoAsignacion('existente')}
-                        />
-                        <span>Vincular / editar lección existente</span>
-                      </label>
-                      <label
-                        className={`modo-opcion ${
-                          modoAsignacion === 'nueva' ? 'activo' : ''
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="modo-asignacion"
-                          value="nueva"
-                          checked={modoAsignacion === 'nueva'}
-                          onChange={() => setModoAsignacion('nueva')}
-                        />
-                        <span>Crear nueva lección</span>
-                      </label>
-                    </div>
+              {/* Zona de carga / reemplazo de video */}
+              <div className="campo-grupo">
+                <label className="campo-etiqueta">Archivo de video (se guarda en el servidor Python)</label>
+                <input
+                  ref={inputFileRef}
+                  type="file"
+                  accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogg,.mov,.mkv"
+                  style={{ display: 'none' }}
+                  onChange={(e) => procesarArchivoVideo(e.target.files?.[0])}
+                />
+                <div
+                  className={`dropzone-video ${arrastrando ? 'arrastrando' : ''}`}
+                  onClick={() => inputFileRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setArrastrando(true)
+                  }}
+                  onDragLeave={() => setArrastrando(false)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setArrastrando(false)
+                    procesarArchivoVideo(e.dataTransfer.files?.[0])
+                  }}
+                >
+                  <p className="dropzone-texto-principal">
+                    {archivoVideo
+                      ? `Nuevo archivo listo: ${archivoVideo.name} (${(archivoVideo.size / (1024 * 1024)).toFixed(1)} MB)`
+                      : videoActualReferencia
+                      ? `Video actual: ${videoActualReferencia} — Haz clic o arrastra otro para reemplazar`
+                      : 'Arrastra un archivo de video (.mp4, .webm, .ogg) o haz clic para examinar'}
+                  </p>
+                </div>
+                {erroresVideo.archivo && <span className="campo-mensaje-error">{erroresVideo.archivo}</span>}
+              </div>
+
+              {/* Vista previa SIEMPRE disponible cuando existe video nuevo o existente + Timeline arrastrable */}
+              {videoPreviewSrc && (
+                <div className="admin-video-preview-bloque">
+                  <video
+                    ref={previewVideoRef}
+                    key={videoPreviewSrc}
+                    src={videoPreviewSrc}
+                    controls
+                    preload="metadata"
+                    className="admin-video-preview-player"
+                    onLoadedMetadata={(e) => {
+                      if (e.target.duration && !Number.isNaN(e.target.duration)) {
+                        const seg = Math.round(e.target.duration)
+                        if (seg > 0) setDuracionDetectada(seg)
+                      }
+                    }}
+                  />
+
+                  <TimelineCheckpoints
+                    videoRef={previewVideoRef}
+                    duracion={duracionDetectada}
+                    checkpoints={checkpoints}
+                    checkpointActivo={checkpointActivo}
+                    alSeleccionarCheckpoint={(idx) => setCheckpointActivo(idx)}
+                    alMoverCheckpoint={moverCheckpointASegundo}
+                    alAgregarEnSegundo={agregarCheckpointEnSegundo}
+                  />
+                </div>
+              )}
+
+              {/* Constructor de checkpoints con los 5 tipos de preguntas */}
+              <div className="seccion-checkpoints-builder">
+                <div className="seccion-subcabecera">
+                  <div>
+                    <h3>Preguntas y checkpoints ({checkpoints.length})</h3>
+                    <p className="texto-suave">
+                      Soporta Opción única, Verdadero/Falso, Múltiple respuesta, Completación y Desarrollo (auto-evaluado).
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    className="boton boton-claro"
+                    onClick={() => agregarCheckpointEnSegundo(Math.min(20, Math.max(5, Math.floor(duracionDetectada / 2))))}
+                  >
+                    + Agregar pregunta
+                  </button>
+                </div>
 
-                  {/* Campos si es lección existente */}
-                  {modoAsignacion === 'existente' && (
-                    <div className="campo-grupo">
-                      <label htmlFor="video-leccion-select" className="campo-etiqueta">
-                        Lección a la que se vinculará el video *
-                      </label>
-                      <select
-                        id="video-leccion-select"
-                        className={`campo-input ${erroresVideo.leccion ? 'con-error' : ''}`}
-                        value={leccionVideoId}
-                        onChange={(e) => {
-                          const idNum = Number(e.target.value)
-                          setLeccionVideoId(idNum)
-                          const lecc = leccionesCursoVideo.find((l) => Number(l.id) === idNum)
-                          if (lecc) {
-                            setDuracionDetectada(lecc.duracion || 60)
-                            setVideoActualReferencia(lecc.video || '')
-                            if (Array.isArray(lecc.cuestionarios)) {
-                              setCheckpoints(
-                                lecc.cuestionarios.map((q, idx) => ({
-                                  id: q.id || Date.now() + idx,
-                                  minuto: Math.floor((q.segundo || 0) / 60),
-                                  segundo: (q.segundo || 0) % 60,
-                                  pregunta: q.pregunta || '',
-                                  opciones:
-                                    Array.isArray(q.opciones) && q.opciones.length > 0
-                                      ? [...q.opciones]
-                                      : ['Opción 1', 'Opción 2'],
-                                  correcta: q.correcta !== undefined ? q.correcta : 0,
-                                  explicacion: q.explicacion || '',
-                                }))
-                              )
-                            }
-                          }
-                          if (erroresVideo.leccion) {
-                            setErroresVideo((prev) => ({ ...prev, leccion: '' }))
-                          }
-                        }}
-                      >
-                        <option value="" disabled>
-                          Selecciona una lección...
-                        </option>
-                        {leccionesCursoVideo.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.id}: {l.titulo} ({formatoTiempo(l.duracion)})
-                          </option>
-                        ))}
-                      </select>
-                      {erroresVideo.leccion && (
-                        <span className="campo-mensaje-error">{erroresVideo.leccion}</span>
-                      )}
-                    </div>
-                  )}
+                {checkpoints.length === 0 ? (
+                  <p className="texto-suave mensaje-vacio-checkpoints">
+                    No hay preguntas en esta lección. Haz clic en la barra del video o pulsa &quot;+ Agregar pregunta&quot;.
+                  </p>
+                ) : (
+                  <div className="checkpoints-lista">
+                    {checkpoints.map((cp, cpIdx) => {
+                      const tiempoCp = Number(cp.minuto || 0) * 60 + Number(cp.segundo || 0)
+                      const fuera = duracionDetectada > 0 && tiempoCp >= duracionDetectada
 
-                  {/* Campos si es nueva lección */}
-                  {modoAsignacion === 'nueva' && (
-                    <div className="modulo-leccion-box">
-                      <h3>Datos de la nueva lección</h3>
-                      <div className="campo-grupo">
-                        <label htmlFor="nueva-leccion-titulo" className="campo-etiqueta">
-                          Título de la lección *
-                        </label>
-                        <input
-                          id="nueva-leccion-titulo"
-                          type="text"
-                          className={`campo-input ${erroresVideo.titulo ? 'con-error' : ''}`}
-                          placeholder="Ej: Técnicas avanzadas de estado"
-                          value={nuevoTituloLeccion}
-                          onChange={(e) => {
-                            setNuevoTituloLeccion(e.target.value)
-                            if (erroresVideo.titulo) {
-                              setErroresVideo((prev) => ({ ...prev, titulo: '' }))
-                            }
-                          }}
-                        />
-                        {erroresVideo.titulo && (
-                          <span className="campo-mensaje-error">{erroresVideo.titulo}</span>
-                        )}
-                      </div>
+                      return (
+                        <div
+                          key={cp.id || cpIdx}
+                          className={`checkpoint-card ${checkpointActivo === cpIdx ? 'seleccionado' : ''}`}
+                          onClick={() => setCheckpointActivo(cpIdx)}
+                        >
+                          <div className="checkpoint-card-header">
+                            <span className="checkpoint-badge">Pregunta #{cpIdx + 1}</span>
 
-                      <div className="admin-form-fila">
-                        <div className="campo-grupo">
-                          <label htmlFor="modulo-destino-select" className="campo-etiqueta">
-                            Módulo del curso
-                          </label>
-                          <select
-                            id="modulo-destino-select"
-                            className="campo-input"
-                            value={moduloDestinoId}
-                            onChange={(e) => setModuloDestinoId(Number(e.target.value))}
-                          >
-                            {modulosCursoVideo.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                Módulo {m.id}: {m.titulo}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                            <select
+                              className="campo-input select-tipo-pregunta"
+                              value={cp.tipo}
+                              onChange={(e) => actualizarCheckpoint(cpIdx, 'tipo', e.target.value)}
+                              aria-label="Tipo de pregunta"
+                            >
+                              {TIPOS_PREGUNTA.map((t) => (
+                                <option key={t.id} value={t.id}>{t.label}</option>
+                              ))}
+                            </select>
 
-                        <div className="campo-grupo">
-                          <label htmlFor="duracion-detectada-input" className="campo-etiqueta">
-                            Duración (segundos)
-                          </label>
-                          <input
-                            id="duracion-detectada-input"
-                            type="number"
-                            min="10"
-                            className="campo-input"
-                            value={duracionDetectada}
-                            onChange={(e) => setDuracionDetectada(Number(e.target.value))}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                            <div className="tiempo-inputs-inline">
+                              <input
+                                type="number"
+                                min="0"
+                                className={`campo-input input-tiempo ${fuera ? 'con-error' : ''}`}
+                                value={cp.minuto}
+                                onChange={(e) => actualizarCheckpoint(cpIdx, 'minuto', Math.max(0, Number(e.target.value) || 0))}
+                              />
+                              <span>min</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="59"
+                                className={`campo-input input-tiempo ${fuera ? 'con-error' : ''}`}
+                                value={cp.segundo}
+                                onChange={(e) => actualizarCheckpoint(cpIdx, 'segundo', Math.max(0, Math.min(59, Number(e.target.value) || 0)))}
+                              />
+                              <span>seg</span>
+                            </div>
 
-                  {/* ============================================================== */}
-                  {/* CONSTRUCTOR DE CHECKPOINTS Y PREGUNTAS INTERACTIVAS             */}
-                  {/* ============================================================== */}
-                  <div className="seccion-checkpoints-builder">
-                    <div className="seccion-subcabecera">
-                      <div>
-                        <h3>Preguntas y checkpoints interactivos</h3>
-                        <p className="texto-suave">
-                          El video se detendrá automáticamente en el tiempo indicado para que el estudiante responda.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="boton boton-claro"
-                        onClick={agregarCheckpoint}
-                      >
-                        + Agregar pregunta / checkpoint
-                      </button>
-                    </div>
+                            <button
+                              type="button"
+                              className="boton-eliminar-item"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                eliminarCheckpoint(cpIdx)
+                              }}
+                            >
+                              Eliminar
+                            </button>
+                          </div>
 
-                    {checkpoints.length === 0 ? (
-                      <p className="texto-suave mensaje-vacio-checkpoints">
-                        No hay preguntas programadas para este video. Pulsa "+ Agregar pregunta / checkpoint" para crear una parada interactiva.
-                      </p>
-                    ) : (
-                      <div className="checkpoints-lista">
-                        {checkpoints.map((cp, cpIdx) => {
-                          const tiempoCp = Number(cp.minuto || 0) * 60 + Number(cp.segundo || 0)
-                          const duracionLimite = Number(duracionDetectada) || 0
-                          const fueraDeLimite = duracionLimite > 0 && tiempoCp >= duracionLimite
+                          {fuera && (
+                            <span className="campo-mensaje-error">
+                              El tiempo ({formatoTiempo(tiempoCp)}) debe ser menor a la duración del video ({formatoTiempo(duracionDetectada)}).
+                            </span>
+                          )}
 
-                          return (
-                            <div key={cp.id || cpIdx} className="checkpoint-card">
-                              <div className="checkpoint-card-header">
-                                <span className="checkpoint-badge">Pregunta #{cpIdx + 1}</span>
+                          <div className="checkpoint-card-cuerpo">
+                            <div className="campo-grupo">
+                              <label className="campo-etiqueta">Enunciado de la pregunta *</label>
+                              <input
+                                type="text"
+                                className="campo-input"
+                                value={cp.pregunta}
+                                onChange={(e) => actualizarCheckpoint(cpIdx, 'pregunta', e.target.value)}
+                                placeholder="Escribe la pregunta que verá el estudiante…"
+                              />
+                            </div>
 
-                                <div className="checkpoint-tiempo-control">
-                                  <span className="tiempo-label">Segundo o minuto de parada:</span>
-                                  <div className="tiempo-inputs-inline">
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      className={`campo-input input-tiempo ${
-                                        erroresVideo[`cp_tiempo_${cpIdx}`] || fueraDeLimite ? 'con-error' : ''
-                                      }`}
-                                      value={cp.minuto}
-                                      title="Minuto de parada"
-                                      onChange={(e) =>
-                                        actualizarCheckpoint(cpIdx, 'minuto', Math.max(0, Number(e.target.value) || 0))
-                                      }
-                                    />
-                                    <span>min</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max="59"
-                                      className={`campo-input input-tiempo ${
-                                        erroresVideo[`cp_tiempo_${cpIdx}`] || fueraDeLimite ? 'con-error' : ''
-                                      }`}
-                                      value={cp.segundo}
-                                      title="Segundo de parada"
-                                      onChange={(e) =>
-                                        actualizarCheckpoint(cpIdx, 'segundo', Math.max(0, Number(e.target.value) || 0))
-                                      }
-                                    />
-                                    <span>seg</span>
-                                    {previsualizacionUrl && (
-                                      <button
-                                        type="button"
-                                        className="boton-tiempo-actual"
-                                        title="Usar la posición actual del reproductor de vista previa"
-                                        onClick={() => capturarTiempoActualPreview(cpIdx)}
-                                      >
-                                        Fijar tiempo actual
-                                      </button>
-                                    )}
-                                  </div>
-                                  <span className="tiempo-duracion-max">
-                                    Límite: {formatoTiempo(duracionDetectada)} ({duracionDetectada}s)
-                                  </span>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  className="boton-eliminar-item"
-                                  title="Eliminar checkpoint"
-                                  onClick={() => eliminarCheckpoint(cpIdx)}
-                                >
-                                  Eliminar
-                                </button>
-                              </div>
-
-                              {erroresVideo[`cp_tiempo_${cpIdx}`] ? (
-                                <div className="checkpoint-error-tiempo">
-                                  <span className="campo-mensaje-error">
-                                    {erroresVideo[`cp_tiempo_${cpIdx}`]}
-                                  </span>
-                                </div>
-                              ) : fueraDeLimite ? (
-                                <div className="checkpoint-error-tiempo">
-                                  <span className="campo-mensaje-error">
-                                    No se pueden agregar preguntas fuera de los límites del propio video ({formatoTiempo(duracionLimite)}). Este checkpoint está configurado en {formatoTiempo(tiempoCp)} ({tiempoCp}s).
-                                  </span>
-                                </div>
-                              ) : null}
-
-                              <div className="checkpoint-card-cuerpo">
+                            {cp.tipo === 'opcion_unica' && (
                               <div className="campo-grupo">
-                                <label className="campo-etiqueta">
-                                  Pregunta para el estudiante *
-                                </label>
-                                <input
-                                  type="text"
-                                  className={`campo-input ${
-                                    erroresVideo[`cp_${cpIdx}`] ? 'con-error' : ''
-                                  }`}
-                                  placeholder="Ej: ¿Qué devuelve una función de componente en React?"
-                                  value={cp.pregunta}
-                                  onChange={(e) =>
-                                    actualizarCheckpoint(cpIdx, 'pregunta', e.target.value)
-                                  }
-                                />
-                                {erroresVideo[`cp_${cpIdx}`] && (
-                                  <span className="campo-mensaje-error">
-                                    {erroresVideo[`cp_${cpIdx}`]}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="campo-grupo">
-                                <label className="campo-etiqueta">
-                                  Opciones de respuesta (marca el círculo de la respuesta correcta) *
-                                </label>
-                                {erroresVideo[`cp_op_${cpIdx}`] && (
-                                  <span className="campo-mensaje-error">
-                                    {erroresVideo[`cp_op_${cpIdx}`]}
-                                  </span>
-                                )}
-
+                                <label className="campo-etiqueta">Opciones (marca la correcta)</label>
                                 <div className="opciones-respuestas-lista">
-                                  {cp.opciones.map((op, opIdx) => (
+                                  {(cp.opciones || []).map((op, opIdx) => (
                                     <div key={opIdx} className="opcion-respuesta-fila">
                                       <input
                                         type="radio"
-                                        id={`radio-${cpIdx}-${opIdx}`}
                                         name={`correcta-${cpIdx}`}
                                         checked={Number(cp.correcta) === opIdx}
-                                        onChange={() =>
-                                          actualizarCheckpoint(cpIdx, 'correcta', opIdx)
-                                        }
-                                        title="Marcar como respuesta correcta"
+                                        onChange={() => actualizarCheckpoint(cpIdx, 'correcta', opIdx)}
                                       />
                                       <input
                                         type="text"
                                         className="campo-input input-opcion-texto"
-                                        placeholder={`Opción de respuesta ${opIdx + 1}`}
                                         value={op}
-                                        onChange={(e) =>
-                                          actualizarOpcion(cpIdx, opIdx, e.target.value)
-                                        }
+                                        onChange={(e) => actualizarOpcion(cpIdx, opIdx, e.target.value)}
                                       />
                                       {cp.opciones.length > 2 && (
                                         <button
                                           type="button"
                                           className="boton-quitar-opcion"
-                                          title="Quitar opción"
                                           onClick={() => eliminarOpcion(cpIdx, opIdx)}
                                         >
                                           Quitar
@@ -1660,195 +1495,383 @@ function Admin() {
                                     </div>
                                   ))}
                                 </div>
-
                                 {cp.opciones.length < 6 && (
-                                  <button
-                                    type="button"
-                                    className="boton-texto-mas"
-                                    onClick={() => agregarOpcion(cpIdx)}
-                                  >
-                                    + Agregar otra opción de respuesta
+                                  <button type="button" className="boton-texto-mas" onClick={() => agregarOpcion(cpIdx)}>
+                                    + Agregar opción
                                   </button>
                                 )}
                               </div>
+                            )}
 
+                            {cp.tipo === 'verdadero_falso' && (
                               <div className="campo-grupo">
-                                <label className="campo-etiqueta">
-                                  Explicación formativa al acertar (opcional)
-                                </label>
-                                <input
-                                  type="text"
-                                  className="campo-input"
-                                  placeholder="Ej: Un componente devuelve elementos JSX que describen lo que se verá en pantalla."
-                                  value={cp.explicacion}
-                                  onChange={(e) =>
-                                    actualizarCheckpoint(cpIdx, 'explicacion', e.target.value)
-                                  }
-                                />
+                                <label className="campo-etiqueta">Respuesta correcta</label>
+                                <div className="selector-modo-asignacion">
+                                  <label className={`modo-opcion ${Number(cp.correcta) === 0 ? 'activo' : ''}`}>
+                                    <input
+                                      type="radio"
+                                      name={`vf-${cpIdx}`}
+                                      checked={Number(cp.correcta) === 0}
+                                      onChange={() => actualizarCheckpoint(cpIdx, 'correcta', 0)}
+                                    />
+                                    <span>Verdadero</span>
+                                  </label>
+                                  <label className={`modo-opcion ${Number(cp.correcta) === 1 ? 'activo' : ''}`}>
+                                    <input
+                                      type="radio"
+                                      name={`vf-${cpIdx}`}
+                                      checked={Number(cp.correcta) === 1}
+                                      onChange={() => actualizarCheckpoint(cpIdx, 'correcta', 1)}
+                                    />
+                                    <span>Falso</span>
+                                  </label>
+                                </div>
                               </div>
+                            )}
+
+                            {cp.tipo === 'multiple_respuesta' && (
+                              <div className="campo-grupo">
+                                <label className="campo-etiqueta">Opciones (marca TODAS las correctas)</label>
+                                <div className="opciones-respuestas-lista">
+                                  {(cp.opciones || []).map((op, opIdx) => (
+                                    <div key={opIdx} className="opcion-respuesta-fila">
+                                      <input
+                                        type="checkbox"
+                                        checked={(cp.correctas || []).includes(opIdx)}
+                                        onChange={() => alternarCorrectaMultiple(cpIdx, opIdx)}
+                                      />
+                                      <input
+                                        type="text"
+                                        className="campo-input input-opcion-texto"
+                                        value={op}
+                                        onChange={(e) => actualizarOpcion(cpIdx, opIdx, e.target.value)}
+                                      />
+                                      {cp.opciones.length > 2 && (
+                                        <button
+                                          type="button"
+                                          className="boton-quitar-opcion"
+                                          onClick={() => eliminarOpcion(cpIdx, opIdx)}
+                                        >
+                                          Quitar
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                {cp.opciones.length < 6 && (
+                                  <button type="button" className="boton-texto-mas" onClick={() => agregarOpcion(cpIdx)}>
+                                    + Agregar opción
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {cp.tipo === 'completacion' && (
+                              <div className="admin-form-fila">
+                                <div className="campo-grupo">
+                                  <label className="campo-etiqueta">Respuestas aceptadas (separadas por coma) *</label>
+                                  <input
+                                    type="text"
+                                    className="campo-input"
+                                    value={cp.respuestasAceptadasTexto || ''}
+                                    onChange={(e) => actualizarCheckpoint(cpIdx, 'respuestasAceptadasTexto', e.target.value)}
+                                    placeholder="Ej: className, class name"
+                                  />
+                                </div>
+                                <div className="campo-grupo">
+                                  <label className="campo-etiqueta">Pista (opcional)</label>
+                                  <input
+                                    type="text"
+                                    className="campo-input"
+                                    value={cp.pista || ''}
+                                    onChange={(e) => actualizarCheckpoint(cpIdx, 'pista', e.target.value)}
+                                    placeholder="Ej: Empieza con class..."
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {cp.tipo === 'desarrollo' && (
+                              <div className="admin-form-fila">
+                                <div className="campo-grupo">
+                                  <label className="campo-etiqueta">Palabras clave para auto-evaluación (por coma)</label>
+                                  <input
+                                    type="text"
+                                    className="campo-input"
+                                    value={cp.palabrasClaveTexto || ''}
+                                    onChange={(e) => actualizarCheckpoint(cpIdx, 'palabrasClaveTexto', e.target.value)}
+                                    placeholder="Ej: props, estado, padre, cambia"
+                                  />
+                                </div>
+                                <div className="campo-grupo">
+                                  <label className="campo-etiqueta">Mínimo de palabras</label>
+                                  <input
+                                    type="number"
+                                    min="3"
+                                    className="campo-input"
+                                    value={cp.minPalabras || 8}
+                                    onChange={(e) => actualizarCheckpoint(cpIdx, 'minPalabras', Number(e.target.value) || 8)}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="campo-grupo">
+                              <label className="campo-etiqueta">Explicación formativa al aprobar (opcional)</label>
+                              <input
+                                type="text"
+                                className="campo-input"
+                                value={cp.explicacion || ''}
+                                onChange={(e) => actualizarCheckpoint(cpIdx, 'explicacion', e.target.value)}
+                                placeholder="Retroalimentación que ve el estudiante al acertar…"
+                              />
                             </div>
                           </div>
-                        )
-                      })}
-                      </div>
-                    )}
+                        </div>
+                      )
+                    })}
                   </div>
-
-                  <div className="admin-form-fila">
-                    <div className="campo-grupo">
-                      <label htmlFor="video-calidad-select" className="campo-etiqueta">
-                        Resolución
-                      </label>
-                      <select
-                        id="video-calidad-select"
-                        className="campo-input"
-                        value={calidadVideo}
-                        onChange={(e) => setCalidadVideo(e.target.value)}
-                      >
-                        <option value="1080">Full HD (1080p)</option>
-                        <option value="720">HD (720p)</option>
-                        <option value="480">Estándar (480p)</option>
-                      </select>
-                    </div>
-
-                    <div className="campo-grupo">
-                      <label htmlFor="video-subtitulos-input" className="campo-etiqueta">
-                        Subtítulos (opcional)
-                      </label>
-                      <input
-                        id="video-subtitulos-input"
-                        type="text"
-                        className="campo-input"
-                        placeholder="Archivo o pista .vtt"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="botones-formulario-video">
-                    <button
-                      type="submit"
-                      className="boton boton-crear-curso"
-                      disabled={guardandoVideo}
-                    >
-                      {guardandoVideo
-                        ? 'Guardando video y preguntas...'
-                        : editandoVideoLeccionId
-                        ? 'Actualizar video y preguntas'
-                        : 'Guardar y vincular video'}
-                    </button>
-                    {editandoVideoLeccionId && (
-                      <button
-                        type="button"
-                        className="boton boton-claro"
-                        onClick={cancelarEdicionVideo}
-                      >
-                        Cancelar
-                      </button>
-                    )}
-                  </div>
-                  {erroresVideo.general && (
-                    <span className="campo-mensaje-error texto-centrado-bloque">
-                      {erroresVideo.general}
-                    </span>
-                  )}
-                </form>
-              </section>
-
-              {/* Panel lateral informativo sobre el curso seleccionado */}
-              <aside className="admin-seccion-preview">
-                <h2>Curso seleccionado</h2>
-                <p className="texto-suave">Información de la línea donde se añadirá el recurso:</p>
-
-                {cursoParaVideo && (
-                  <article
-                    className="admin-preview-tarjeta"
-                    style={{ '--color-linea': cursoParaVideo.color }}
-                  >
-                    <div className="preview-tarjeta-cuerpo">
-                      <span className="insignia">{cursoParaVideo.id}</span>
-                      <div className="preview-tarjeta-info">
-                        <h3>{cursoParaVideo.titulo}</h3>
-                        <p className="texto-suave">{cursoParaVideo.descripcion}</p>
-                        <p className="meta">
-                          {cursoParaVideo.categoria} · {cursoParaVideo.nivel} ·{' '}
-                          {leccionesCursoVideo.length} lecciones
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="preview-tarjeta-pie">
-                      <span className="texto-suave">
-                        {archivoVideo
-                          ? `Archivo listo: ${archivoVideo.name}`
-                          : videoActualReferencia
-                          ? `Video actual asignado: ${videoActualReferencia}`
-                          : 'Esperando selección de video...'}
-                      </span>
-                    </div>
-                  </article>
                 )}
-              </aside>
-            </div>
-
-            {/* Listado de lecciones y videos del curso seleccionado con opción de Editar */}
-            <section className="admin-seccion-catalogo">
-              <div className="catalogo-cabecera">
-                <div>
-                  <h2>Lecciones y videos en {cursoParaVideo?.titulo}</h2>
-                  <p className="texto-suave">
-                    Revisa y edita las grabaciones y checkpoints asignados a cada estación de este curso.
-                  </p>
-                </div>
               </div>
 
-              <div className="lista-cursos">
-                {leccionesCursoVideo.map((l) => {
-                  const esPersonalizado = typeof l.video === 'string' && l.video.startsWith('idb:')
-                  const cantPreguntas = l.cuestionarios?.length || 0
-                  return (
-                    <article
-                      key={l.id}
-                      className="fila-curso"
-                      style={{ '--color-linea': cursoParaVideo?.color }}
-                    >
-                      <span className="insignia">{l.id}</span>
+              <div className="botones">
+                <button type="submit" className="boton" disabled={guardandoVideo}>
+                  {guardandoVideo ? 'Guardando en servidor…' : 'Guardar video y checkpoints'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
+        {/* ==================== PESTAÑA 3: SOLICITUDES Y ACCESOS ==================== */}
+        {pestanaActiva === 'solicitudes' && (
+          <div className="admin-grid">
+            <section className="admin-tarjeta">
+              <h2>Otorgar acceso directo a un estudiante</h2>
+              <p className="texto-suave" style={{ marginBottom: '14px' }}>
+                Habilita manualmente cualquier curso restringido a un estudiante registrado.
+              </p>
+
+              {mensajeAcceso && <div className="alerta-exito">{mensajeAcceso}</div>}
+
+              <form onSubmit={handleOtorgarManual} className="admin-formulario">
+                <div className="campo-grupo">
+                  <label htmlFor="manual-est" className="campo-etiqueta">Estudiante</label>
+                  <select
+                    id="manual-est"
+                    className="campo-input"
+                    value={manualUsuarioId}
+                    onChange={(e) => setManualUsuarioId(e.target.value)}
+                    required
+                  >
+                    <option value="">Selecciona un estudiante…</option>
+                    {estudiantesLista.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.nombre} (@{u.username})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="campo-grupo">
+                  <label htmlFor="manual-curso" className="campo-etiqueta">Curso restringido</label>
+                  <select
+                    id="manual-curso"
+                    className="campo-input"
+                    value={manualCursoId}
+                    onChange={(e) => setManualCursoId(e.target.value)}
+                    required
+                  >
+                    <option value="">Selecciona un curso…</option>
+                    {cursosRestringidos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.titulo} (${(c.precio || 0).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button type="submit" className="boton">Habilitar acceso</button>
+              </form>
+            </section>
+
+            <section className="admin-tarjeta">
+              <div className="seccion-subcabecera">
+                <h2>Solicitudes y pagos simulados ({solicitudes.length})</h2>
+                <button type="button" className="boton boton-claro" onClick={cargarSolicitudesYEstudiantes}>
+                  Actualizar
+                </button>
+              </div>
+
+              {cargandoSolicitudes ? (
+                <p className="texto-suave">Cargando solicitudes…</p>
+              ) : solicitudes.length === 0 ? (
+                <p className="texto-suave">No hay solicitudes ni inscripciones registradas todavía.</p>
+              ) : (
+                <div className="admin-lista-cursos">
+                  {solicitudes.map((s) => (
+                    <div key={s.id} className="admin-curso-item">
                       <div>
-                        <h3>
-                          {l.titulo}
-                          {esPersonalizado && <span className="tag-nuevo">Video cargado</span>}
-                        </h3>
+                        <div className="admin-curso-titulo-row">
+                          <strong>{s.estudianteNombre}</strong>
+                          <span className="texto-suave">@{s.estudianteUsername}</span>
+                          <span className={`etiqueta-acceso ${s.estado === 'aprobado' ? 'aprobado' : s.estado === 'pendiente' ? 'pendiente' : 'restringido'}`}>
+                            {s.estado}
+                          </span>
+                        </div>
+                        <p><strong>Curso:</strong> {s.cursoTitulo}</p>
                         <p className="texto-suave">
-                          Fuente del video:{' '}
-                          {esPersonalizado
-                            ? 'Archivo cargado en el navegador (IndexedDB)'
-                            : l.video}
+                          Método: {s.metodo}
+                          {s.referenciaPago ? ` · Ref: ${s.referenciaPago} ($${Number(s.montoPagado || 0).toFixed(2)})` : ''}
                         </p>
-                        <p className="meta">
-                          Duración: {formatoTiempo(l.duracion)} · {cantPreguntas}{' '}
-                          {cantPreguntas === 1 ? 'pregunta configurada' : 'preguntas configuradas'}
-                        </p>
+                        {s.mensajeSolicitud && (
+                          <p className="texto-suave">&ldquo;{s.mensajeSolicitud}&rdquo;</p>
+                        )}
                       </div>
 
-                      <div className="admin-acciones-curso">
+                      <div className="admin-curso-acciones">
+                        {s.estado !== 'aprobado' && (
+                          <button
+                            type="button"
+                            className="boton"
+                            onClick={() => handleResolverSolicitud(s.id, 'aprobado')}
+                          >
+                            Aprobar
+                          </button>
+                        )}
+                        {s.estado !== 'rechazado' && (
+                          <button
+                            type="button"
+                            className="boton-eliminar-item"
+                            onClick={() => handleResolverSolicitud(s.id, 'rechazado')}
+                          >
+                            Revocar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* ==================== PESTAÑA 4: USUARIOS Y ROLES (SOLO ADMIN GENERAL) ==================== */}
+        {pestanaActiva === 'usuarios' && esAdminGeneral && (
+          <div className="admin-grid">
+            <section className="admin-tarjeta">
+              <h2>Crear cuenta de Profesor o Administrador</h2>
+              <p className="texto-suave" style={{ marginBottom: '14px' }}>
+                Los estudiantes se registran por su cuenta en el login; las cuentas con permisos para subir videos y gestionar cursos se crean únicamente aquí.
+              </p>
+
+              {mensajeUsuario && <div className="alerta-exito">{mensajeUsuario}</div>}
+              {errorUsuario && <div className="alerta-error">{errorUsuario}</div>}
+
+              <form onSubmit={handleCrearUsuario} className="admin-formulario">
+                <div className="campo-grupo">
+                  <label htmlFor="u-nombre" className="campo-etiqueta">Nombre completo *</label>
+                  <input
+                    id="u-nombre"
+                    type="text"
+                    className="campo-input"
+                    value={nuevoUserNombre}
+                    onChange={(e) => setNuevoUserNombre(e.target.value)}
+                    placeholder="Ej: Prof. Laura Medina"
+                    required
+                  />
+                </div>
+
+                <div className="admin-form-fila">
+                  <div className="campo-grupo">
+                    <label htmlFor="u-username" className="campo-etiqueta">Usuario *</label>
+                    <input
+                      id="u-username"
+                      type="text"
+                      className="campo-input"
+                      value={nuevoUserUsername}
+                      onChange={(e) => setNuevoUserUsername(e.target.value)}
+                      placeholder="Ej: prof_laura"
+                      required
+                    />
+                  </div>
+                  <div className="campo-grupo">
+                    <label htmlFor="u-rol" className="campo-etiqueta">Rol *</label>
+                    <select
+                      id="u-rol"
+                      className="campo-input"
+                      value={nuevoUserRol}
+                      onChange={(e) => setNuevoUserRol(e.target.value)}
+                    >
+                      <option value="profesor">Profesor (gestiona cursos, videos y accesos)</option>
+                      <option value="admin_general">Administrador general (control total)</option>
+                      <option value="estudiante">Estudiante</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="admin-form-fila">
+                  <div className="campo-grupo">
+                    <label htmlFor="u-email" className="campo-etiqueta">Correo (opcional)</label>
+                    <input
+                      id="u-email"
+                      type="email"
+                      className="campo-input"
+                      value={nuevoUserEmail}
+                      onChange={(e) => setNuevoUserEmail(e.target.value)}
+                      placeholder="laura@anden.urbe.edu"
+                    />
+                  </div>
+                  <div className="campo-grupo">
+                    <label htmlFor="u-pass" className="campo-etiqueta">Contraseña inicial *</label>
+                    <input
+                      id="u-pass"
+                      type="password"
+                      className="campo-input"
+                      value={nuevoUserPassword}
+                      onChange={(e) => setNuevoUserPassword(e.target.value)}
+                      placeholder="Mínimo 4 caracteres"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="boton">Crear cuenta</button>
+              </form>
+            </section>
+
+            <section className="admin-tarjeta">
+              <h2>Usuarios registrados ({usuariosLista.length})</h2>
+              {cargandoUsuarios ? (
+                <p className="texto-suave">Cargando usuarios…</p>
+              ) : (
+                <div className="admin-lista-cursos">
+                  {usuariosLista.map((u) => (
+                    <div key={u.id} className="admin-curso-item">
+                      <div>
+                        <div className="admin-curso-titulo-row">
+                          <strong>{u.nombre}</strong>
+                          <span className="texto-suave">@{u.username}</span>
+                          <span className={`etiqueta-rol rol-${u.rol}`}>{u.rol.replace('_', ' ')}</span>
+                          {!u.activo && <span className="etiqueta-acceso restringido">Inactivo</span>}
+                        </div>
+                        <p className="texto-suave">{u.email || 'Sin correo'}</p>
+                      </div>
+
+                      {u.id !== usuarioActual?.id && (
                         <button
                           type="button"
                           className="boton boton-claro"
-                          onClick={() => iniciarEdicionVideoLeccion(l, cursoParaVideo.id)}
+                          onClick={() => handleCambiarEstadoUsuario(u)}
                         >
-                          Editar video y preguntas
+                          {u.activo ? 'Desactivar' : 'Reactivar'}
                         </button>
-                        <Link
-                          to={`/aula/${cursoParaVideo.id}/${l.id}`}
-                          className="boton boton-claro"
-                        >
-                          Ver en aula
-                        </Link>
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           </div>
         )}

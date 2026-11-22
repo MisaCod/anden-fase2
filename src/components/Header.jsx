@@ -1,13 +1,17 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import usuario from '../data/usuario.json'
 import { useAuth } from '../contextos/AuthContext.jsx'
 import { useProgreso } from '../contextos/ProgresoContext.jsx'
 import { XP_POR_NIVEL } from '../logica/gamificacion.js'
 
+function etiquetaRol(rol) {
+  if (rol === 'admin_general') return 'Admin General'
+  if (rol === 'profesor') return 'Profesor'
+  return ''
+}
+
 function Header() {
-  // El nivel sale del progreso global: cambia en cuanto ganas XP, en cualquier página
   const { resumen } = useProgreso()
-  const { usuarioActual, cerrarSesion, esAdmin } = useAuth()
+  const { usuarioActual, cerrarSesion, esStaff, esAdminGeneral } = useAuth()
   const navigate = useNavigate()
 
   function handleLogout() {
@@ -15,13 +19,15 @@ function Header() {
     navigate('/')
   }
 
+  const badgeRol = etiquetaRol(usuarioActual?.rol)
+
   return (
     <header className="header">
       <div className="header-contenido">
         <Link to="/" className="logo">
           <span className="logo-punto"></span>
           andén
-          {esAdmin && <span className="badge-admin-header">Admin</span>}
+          {badgeRol && <span className="badge-admin-header">{badgeRol}</span>}
         </Link>
 
         <nav className="nav">
@@ -30,9 +36,9 @@ function Header() {
           <NavLink to="/aula">Aula</NavLink>
           <NavLink to="/progreso">Mi progreso</NavLink>
           <NavLink to="/logros">Logros</NavLink>
-          {esAdmin && (
+          {esStaff && (
             <NavLink to="/admin" className="enlace-admin-nav">
-              Panel Admin
+              {esAdminGeneral ? 'Panel Admin' : 'Panel Profesor'}
             </NavLink>
           )}
         </nav>
@@ -44,19 +50,16 @@ function Header() {
               <span className="mini-barra">
                 <span style={{ width: (resumen.xpEnNivel / XP_POR_NIVEL) * 100 + '%' }}></span>
               </span>
-              <span className="sr-only">
-                , {resumen.xpEnNivel} de {XP_POR_NIVEL} XP
-              </span>
             </span>
-            <span className="avatar">
-              {usuarioActual?.iniciales || usuario.iniciales}
+            <span className="avatar" title={usuarioActual?.nombre || 'Estudiante'}>
+              {usuarioActual?.iniciales || 'US'}
             </span>
           </Link>
 
           <button
             type="button"
-            onClick={handleLogout}
             className="boton-cerrar-sesion"
+            onClick={handleLogout}
             title="Cerrar sesión"
           >
             Salir

@@ -1,58 +1,74 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { apiFetch, guardarToken, obtenerToken } from '../servicios/api.js'
 
 const AuthContext = createContext(null)
-
 const CLAVE_SESION = 'anden-sesion'
-
-// Usuarios registrados según los requisitos
-const USUARIOS_VALIDOS = [
-  {
-    username: 'diego',
-    password: '1234',
-    nombre: 'Diego Cardozo',
-    primerNombre: 'Diego',
-    iniciales: 'DC',
-    rol: 'usuario',
-  },
-  {
-    username: 'admin',
-    password: '1234',
-    nombre: 'Administrador',
-    primerNombre: 'Admin',
-    iniciales: 'AD',
-    rol: 'admin',
-  },
-]
 
 function leerSesionGuardada() {
   try {
     const sesion = localStorage.getItem(CLAVE_SESION)
     return sesion ? JSON.parse(sesion) : null
-  } catch (error) {
+  } catch {
     return null
+  }
+}
+
+function guardarSesion(usuario) {
+  try {
+    if (usuario) localStorage.setItem(CLAVE_SESION, JSON.stringify(usuario))
+    else localStorage.removeItem(CLAVE_SESION)
+  } catch {
+    // Ignorar cuota de almacenamiento
   }
 }
 
 export function AuthProvider({ children }) {
   const [usuarioActual, setUsuarioActual] = useState(leerSesionGuardada)
+  const [cargandoAuth, setCargandoAuth] = useState(() => Boolean(obtenerToken()))
 
+  const cerrarSesion = useCallback(() => {
+    guardarToken(null)
+    guardarSesion(null)
+    setUsuarioActual(null)
+  }, [])
+
+  // Validar sesión existente contra FastAPI al arrancar
   useEffect(() => {
-    try {
-      if (usuarioActual) {
-        localStorage.setItem(CLAVE_SESION, JSON.stringify(usuarioActual))
-      } else {
-        localStorage.removeItem(CLAVE_SESION)
-      }
-    } catch (error) {
-      // Manejo seguro de cuota de localStorage
+    const token = obtenerToken()
+    if (!token) {
+      setCargandoAuth(false)
+      return
     }
-  }, [usuarioActual])
+    let activo = true
+    apiFetch('/api/auth/me')
+      .then((res) => {
+        if (!activo) return
+        if (res?.usuario) {
+          setUsuarioActual(res.usuario)
+          guardarSesion(res.usuario)
+        } else {
+          cerrarSesion()
+        }
+      })
+      .catch((err) => {
+        if (!activo) return
+        if (err.status === 401 || err.status === 403) {
+          cerrarSesion()
+        }
+      })
+      .finally(() => {
+        if (activo) setCargandoAuth(false)
+      })
 
-  function iniciarSesion(username, password) {
+    return () => {
+      activo = false
+    }
+  }, [cerrarSesion])
+
+  async function iniciarSesion(username, password) {
     const usuarioLimpio = (username || '').trim().toLowerCase()
     const passwordLimpio = (password || '').trim()
 
-    // Validaciones de datos de entrada
     if (!usuarioLimpio && !passwordLimpio) {
       return { ok: false, error: 'Por favor, ingresa tu usuario y contraseña.' }
     }
@@ -63,47 +79,58 @@ export function AuthProvider({ children }) {
       return { ok: false, error: 'Por favor, ingresa tu contraseña.' }
     }
 
-    // Validación contra usuarios del sistema
-    const encontrado = USUARIOS_VALIDOS.find(
-      (u) => u.username.toLowerCase() === usuarioLimpio && u.password === passwordLimpio
-    )
-
-    if (!encontrado) {
-      return {
-        ok: false,
-        error: 'Credenciales inválidas. Usuario o contraseña incorrectos.',
-      }
-    }
-
-    // Sesión exitosa (sin almacenar la contraseña en memoria activa de sesión)
-    const datosSesion = {
-      username: encontrado.username,
-      nombre: encontrado.nombre,
-      primerNombre: encontrado.primerNombre,
-      iniciales: encontrado.iniciales,
-      rol: encontrado.rol,
-    }
-
-    setUsuarioActual(datosSesion)
-    return { ok: true, usuario: datosSesion }
-  }
-
-  function cerrarSesion() {
-    setUsuarioActual(null)
     try {
-      localStorage.removeItem(CLAVE_SESION)
-    } catch (e) {
-      // Ignorar error de almacenamiento
+      const res = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: usuarioLimpio, password: passwordLimpio }),
+      })
+      guardarToken(res.token)
+      guardarSesion(res.usuario)
+      setUsuarioActual(res.usuario)
+      return { ok: true, usuario: res.usuario }
+    } catch (err) {
+      return { ok: false, error: err.message || 'No se pudo iniciar sesión.' }
     }
   }
+
+  async function registrarEstudiante({ nombre, username, email, password }) {
+    try {
+      const res = await apiFetch('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          nombre: (nombre || '').trim(),
+          username: (username || '').trim().toLowerCase(),
+          email: (email || '').trim() || null,
+          password: (password || '').trim(),
+        }),
+      })
+      guardarToken(res.token)
+      guardarSesion(res.usuario)
+      setUsuarioActual(res.usuario)
+      return { ok: true, usuario: res.usuario }
+    } catch (err) {
+      return { ok: false, error: err.message || 'No se pudo crear la cuenta.' }
+    }
+  }
+
+  const rol = usuarioActual?.rol || null
+  const esAdminGeneral = rol === 'admin_general'
+  const esProfesor = rol === 'profesor'
+  const esStaff = esAdminGeneral || esProfesor
 
   return (
     <AuthContext.Provider
       value={{
         usuarioActual,
+        cargandoAuth,
         estaAutenticado: Boolean(usuarioActual),
-        esAdmin: usuarioActual?.rol === 'admin',
+        rol,
+        esAdminGeneral,
+        esProfesor,
+        esStaff,
+        esAdmin: esStaff,
         iniciarSesion,
+        registrarEstudiante,
         cerrarSesion,
       }}
     >

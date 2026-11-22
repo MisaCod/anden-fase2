@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Logo de andén">
+  <rect width="64" height="64" rx="16" fill="#1d3b3a" />
+  <line x1="12" y1="36" x2="52" y2="36" stroke="#6a9c89" stroke-width="5" stroke-linecap="round" />
+  <circle cx="20" cy="36" r="6" fill="#f2f4f3" stroke="#2f6f73" stroke-width="3" />
+  <circle cx="44" cy="36" r="8" fill="#e06d53" stroke="#ffffff" stroke-width="3" />
+  <path d="M22 20 L32 13 L42 20" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

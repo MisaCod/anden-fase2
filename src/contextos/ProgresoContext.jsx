@@ -1,107 +1,170 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { useAuth } from './AuthContext.jsx'
 import { useCursos } from './CursosContext.jsx'
-import usuario from '../data/usuario.json'
-import { calcularResumen, xpPorRespuesta, XP_CURSO, XP_LECCION } from '../logica/gamificacion.js'
-import { avanceDe, cursoTerminado, siguienteLeccion } from '../logica/progreso.js'
+import { apiFetch } from '../servicios/api.js'
 
-// El progreso es como $_SESSION: lo ven todas las páginas.
-// Además se guarda en el equipo (localStorage) para no perderlo al recargar.
 const ProgresoContext = createContext(null)
 
-const CLAVE = 'anden-progreso'
-const semilla = usuario.progreso // el progreso inicial que "devuelve el servidor"
-
-// Lee lo guardado en este equipo. Si no hay nada o está dañado, usa la semilla
-function leerGuardado() {
-  try {
-    const texto = localStorage.getItem(CLAVE)
-    if (texto === null) return semilla
-    return { ...semilla, ...JSON.parse(texto) } // lo guardado pisa a la semilla; lo que le falte queda de la semilla
-  } catch (error) {
-    return semilla
-  }
+const ESTADO_VACIO = {
+  xp: 0,
+  ultimaLeccion: null,
+  lecciones: {},
+  respuestas: {},
+  resumen: {
+    xp: 0,
+    nivel: 1,
+    xpEnNivel: 0,
+    faltan: 300,
+    leccionesCompletadas: 0,
+    preguntasAcertadas: 0,
+    porcentajeAciertosGlobal: 0,
+    minutos: 0,
+    diasSeguidos: 0,
+    rachaAciertosActual: 0,
+    mejorRachaAciertos: 0,
+  },
+  estadisticasPorCurso: {},
+  habilidades: [],
+  logros: [],
+  certificados: [],
 }
 
 export function ProgresoProvider({ children }) {
-  const { cursos } = useCursos()
-  // La función que recibe useState se ejecuta solo la primera vez
-  const [progreso, setProgreso] = useState(leerGuardado)
+  const { estaAutenticado, usuarioActual } = useAuth()
+  const { recargarCursos } = useCursos()
+  const [estado, setEstado] = useState(ESTADO_VACIO)
+  const [cargandoProgreso, setCargandoProgreso] = useState(false)
 
-  // Después de cada cambio del progreso, se guarda en el equipo
-  useEffect(() => {
+  const recargarProgreso = useCallback(async () => {
+    if (!estaAutenticado) {
+      setEstado(ESTADO_VACIO)
+      return ESTADO_VACIO
+    }
+    setCargandoProgreso(true)
     try {
-      localStorage.setItem(CLAVE, JSON.stringify(progreso))
-    } catch (error) {
-      // Si el navegador no deja guardar (por ejemplo en modo privado), la app sigue igual
+      const data = await apiFetch('/api/progreso')
+      setEstado(data || ESTADO_VACIO)
+      return data
+    } catch {
+      return ESTADO_VACIO
+    } finally {
+      setCargandoProgreso(false)
     }
-  }, [progreso])
+  }, [estaAutenticado])
 
-  // Puerta para cambiar una parte del progreso: copia el anterior, cambia la copia y la devuelve.
-  // Así nunca se modifica el estado directamente ni se trabaja con un progreso viejo
-  function cambiarProgreso(cambio) {
-    setProgreso((anterior) => {
-      const copia = structuredClone(anterior)
-      cambio(copia)
-      return copia
-    })
-  }
+  useEffect(() => {
+    if (estaAutenticado) {
+      recargarProgreso()
+    } else {
+      setEstado(ESTADO_VACIO)
+    }
+  }, [estaAutenticado, usuarioActual?.id, recargarProgreso])
 
-  // Guarda el segundo más lejano que se vio de una lección
-  function guardarAvance(cursoId, leccionId, segundo) {
-    cambiarProgreso((p) => {
-      const avance = avanceDe(p, leccionId)
-      p.lecciones[leccionId] = {
-        maximo: Math.max(avance.maximo, segundo),
-        completada: avance.completada,
+  const guardarAvance = useCallback((cursoId, leccionId, segundo) => {
+    // Actualización optimista inmediata para fluidez del reproductor
+    setEstado((prev) => {
+      const prevLecc = prev.lecciones[leccionId] || { maximo: 0, completada: false }
+      return {
+        ...prev,
+        ultimaLeccion: { cursoId, leccionId },
+        lecciones: {
+          ...prev.lecciones,
+          [leccionId]: {
+            maximo: Math.max(prevLecc.maximo || 0, segundo),
+            completada: prevLecc.completada,
+          },
+        },
       }
-      p.ultimaLeccion = { cursoId: cursoId, leccionId: leccionId }
     })
-  }
 
-  // Solo las respuestas correctas se guardan y suman XP, una vez por pregunta
-  function responder(pregunta, opcion, intento) {
-    if (opcion !== pregunta.correcta) return
-    cambiarProgreso((p) => {
-      if (p.respuestas[pregunta.id]) return
-      p.respuestas[pregunta.id] = { intentos: intento }
-      p.xp += xpPorRespuesta(intento)
+    apiFetch('/api/progreso/avance', {
+      method: 'POST',
+      body: JSON.stringify({ cursoId, leccionId, segundo }),
     })
-  }
+      .then((nuevo) => {
+        if (nuevo) setEstado(nuevo)
+      })
+      .catch(() => {
+        // Reintento silencioso en el siguiente segundo
+      })
+  }, [])
 
-  // Marca la lección como completada (una sola vez) y suma el XP de la lección y del curso
-  function completarLeccion(curso, leccion) {
-    cambiarProgreso((p) => {
-      if (avanceDe(p, leccion.id).completada) return
-      p.lecciones[leccion.id] = { maximo: leccion.duracion, completada: true }
-      p.xp += XP_LECCION
-      if (cursoTerminado(curso, p)) p.xp += XP_CURSO
-
-      const siguiente = siguienteLeccion(curso, leccion)
-      if (siguiente) p.ultimaLeccion = { cursoId: curso.id, leccionId: siguiente.id }
+  const responder = useCallback(async (pregunta, respuesta, intento = 1, modoRepaso = false) => {
+    const res = await apiFetch('/api/progreso/responder', {
+      method: 'POST',
+      body: JSON.stringify({
+        preguntaId: pregunta.id,
+        respuesta,
+        intento,
+        modoRepaso,
+      }),
     })
-  }
-
-  // Reiniciar no usa cambiarProgreso: no cambia una parte, reemplaza todo por la semilla.
-  // No hace falta copiarla porque nadie la modifica: los cambios siempre se hacen sobre una copia
-  function reiniciar() {
-    if (window.confirm('¿Reiniciar tu progreso? Se borra lo guardado en este equipo y vuelves al punto de partida.')) {
-      setProgreso(semilla)
+    if (res?.progreso) {
+      setEstado(res.progreso)
     }
-  }
+    return res
+  }, [])
 
-  // Nivel, XP del nivel y estadísticas: se calculan, no se guardan
-  const resumen = calcularResumen(cursos, progreso)
+  const completarLeccion = useCallback(
+    async (curso, leccion) => {
+      try {
+        const res = await apiFetch('/api/progreso/completar-leccion', {
+          method: 'POST',
+          body: JSON.stringify({ cursoId: curso.id, leccionId: leccion.id }),
+        })
+        if (res?.progreso) {
+          setEstado(res.progreso)
+        }
+        // Recargar cursos por si se desbloqueó una prelación de otro curso
+        await recargarCursos()
+        return res
+      } catch {
+        return null
+      }
+    },
+    [recargarCursos]
+  )
+
+  const reiniciar = useCallback(async () => {
+    try {
+      const nuevo = await apiFetch('/api/progreso/reiniciar', { method: 'POST' })
+      if (nuevo) setEstado(nuevo)
+      await recargarCursos()
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err.message || 'No se pudo reiniciar el progreso.' }
+    }
+  }, [recargarCursos])
+
+  const progreso = {
+    xp: estado.xp,
+    ultimaLeccion: estado.ultimaLeccion,
+    lecciones: estado.lecciones,
+    respuestas: estado.respuestas,
+  }
 
   return (
     <ProgresoContext.Provider
-      value={{ progreso, resumen, guardarAvance, responder, completarLeccion, reiniciar }}
+      value={{
+        progreso,
+        resumen: estado.resumen,
+        estadisticasPorCurso: estado.estadisticasPorCurso || {},
+        habilidades: estado.habilidades || [],
+        logros: estado.logros || [],
+        certificados: estado.certificados || [],
+        cargandoProgreso,
+        recargarProgreso,
+        guardarAvance,
+        responder,
+        completarLeccion,
+        reiniciar,
+      }}
     >
       {children}
     </ProgresoContext.Provider>
   )
 }
 
-// Atajo para usar el progreso en cualquier componente
 export function useProgreso() {
   return useContext(ProgresoContext)
 }
