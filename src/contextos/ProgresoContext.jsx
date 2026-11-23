@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useAuth } from './AuthContext.jsx'
 import { useCursos } from './CursosContext.jsx'
 import { apiFetch } from '../servicios/api.js'
@@ -29,21 +29,56 @@ const ESTADO_VACIO = {
   certificados: [],
 }
 
+/**
+ * Evita que una respuesta tardía de /avance sobrescriba lecciones ya marcadas
+ * como completadas o retroceda el segundo máximo visto.
+ */
+function fusionarAvanceSinRetroceso(anterior, nuevo) {
+  if (!nuevo) return anterior
+  const leccionesCombinadas = { ...(nuevo.lecciones || {}) }
+  for (const [id, prevLecc] of Object.entries(anterior.lecciones || {})) {
+    const nuevaLecc = leccionesCombinadas[id]
+    if (!nuevaLecc) {
+      leccionesCombinadas[id] = prevLecc
+    } else if (prevLecc.completada && !nuevaLecc.completada) {
+      leccionesCombinadas[id] = {
+        maximo: Math.max(prevLecc.maximo || 0, nuevaLecc.maximo || 0),
+        completada: true,
+      }
+    } else {
+      leccionesCombinadas[id] = {
+        ...nuevaLecc,
+        maximo: Math.max(prevLecc.maximo || 0, nuevaLecc.maximo || 0),
+      }
+    }
+  }
+  return {
+    ...nuevo,
+    xp: Math.max(anterior.xp || 0, nuevo.xp || 0),
+    lecciones: leccionesCombinadas,
+  }
+}
+
 export function ProgresoProvider({ children }) {
   const { estaAutenticado, usuarioActual } = useAuth()
   const { recargarCursos } = useCursos()
   const [estado, setEstado] = useState(ESTADO_VACIO)
   const [cargandoProgreso, setCargandoProgreso] = useState(false)
+  // Contador monotónico para descartar respuestas viejas de guardarAvance frente a completarLeccion/responder
+  const versionRef = useRef(0)
 
   const recargarProgreso = useCallback(async () => {
     if (!estaAutenticado) {
       setEstado(ESTADO_VACIO)
       return ESTADO_VACIO
     }
+    const miVersion = ++versionRef.current
     setCargandoProgreso(true)
     try {
       const data = await apiFetch('/api/progreso')
-      setEstado(data || ESTADO_VACIO)
+      if (miVersion === versionRef.current) {
+        setEstado(data || ESTADO_VACIO)
+      }
       return data
     } catch {
       return ESTADO_VACIO
@@ -56,11 +91,13 @@ export function ProgresoProvider({ children }) {
     if (estaAutenticado) {
       recargarProgreso()
     } else {
+      versionRef.current += 1
       setEstado(ESTADO_VACIO)
     }
   }, [estaAutenticado, usuarioActual?.id, recargarProgreso])
 
-  const guardarAvance = useCallback((cursoId, leccionId, segundo) => {
+  const guardarAvance = useCallback((cursoId, leccionId, segundo, duracionReal = null) => {
+    const miVersion = versionRef.current
     // Actualización optimista inmediata para fluidez del reproductor
     setEstado((prev) => {
       const prevLecc = prev.lecciones[leccionId] || { maximo: 0, completada: false }
@@ -71,18 +108,25 @@ export function ProgresoProvider({ children }) {
           ...prev.lecciones,
           [leccionId]: {
             maximo: Math.max(prevLecc.maximo || 0, segundo),
-            completada: prevLecc.completada,
+            completada: Boolean(prevLecc.completada),
           },
         },
       }
     })
 
+    const payload = { cursoId, leccionId, segundo }
+    if (duracionReal && duracionReal > 0) {
+      payload.duracionReal = Math.round(duracionReal)
+    }
+
     apiFetch('/api/progreso/avance', {
       method: 'POST',
-      body: JSON.stringify({ cursoId, leccionId, segundo }),
+      body: JSON.stringify(payload),
     })
       .then((nuevo) => {
-        if (nuevo) setEstado(nuevo)
+        if (nuevo && miVersion === versionRef.current) {
+          setEstado((prev) => fusionarAvanceSinRetroceso(prev, nuevo))
+        }
       })
       .catch(() => {
         // Reintento silencioso en el siguiente segundo
@@ -90,6 +134,7 @@ export function ProgresoProvider({ children }) {
   }, [])
 
   const responder = useCallback(async (pregunta, respuesta, intento = 1, modoRepaso = false) => {
+    versionRef.current += 1
     const res = await apiFetch('/api/progreso/responder', {
       method: 'POST',
       body: JSON.stringify({
@@ -100,22 +145,37 @@ export function ProgresoProvider({ children }) {
       }),
     })
     if (res?.progreso) {
-      setEstado(res.progreso)
+      setEstado((prev) => fusionarAvanceSinRetroceso(prev, res.progreso))
     }
     return res
   }, [])
 
   const completarLeccion = useCallback(
-    async (curso, leccion) => {
+    async (curso, leccion, duracionReal = null) => {
+      // Invalida cualquier /avance en vuelo y marca completada optimistamente al instante
+      versionRef.current += 1
+      const durFinal = Math.max(Number(leccion.duracion) || 0, Math.round(duracionReal || 0))
+      setEstado((prev) => ({
+        ...prev,
+        lecciones: {
+          ...prev.lecciones,
+          [leccion.id]: { maximo: durFinal, completada: true },
+        },
+      }))
+
       try {
+        const payload = { cursoId: curso.id, leccionId: leccion.id }
+        if (duracionReal && duracionReal > 0) {
+          payload.duracionReal = Math.round(duracionReal)
+        }
         const res = await apiFetch('/api/progreso/completar-leccion', {
           method: 'POST',
-          body: JSON.stringify({ cursoId: curso.id, leccionId: leccion.id }),
+          body: JSON.stringify(payload),
         })
         if (res?.progreso) {
           setEstado(res.progreso)
         }
-        // Recargar cursos por si se desbloqueó una prelación de otro curso
+        // Recargar cursos por si cambió la duración real o se desbloqueó una prelación
         await recargarCursos()
         return res
       } catch {
@@ -126,6 +186,7 @@ export function ProgresoProvider({ children }) {
   )
 
   const reiniciar = useCallback(async () => {
+    versionRef.current += 1
     try {
       const nuevo = await apiFetch('/api/progreso/reiniciar', { method: 'POST' })
       if (nuevo) setEstado(nuevo)

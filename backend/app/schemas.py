@@ -48,7 +48,7 @@ class PreguntaInput(BaseModel):
 class LeccionInput(BaseModel):
     id: Optional[int] = None
     titulo: str = Field(..., min_length=1, max_length=140)
-    duracion: int = Field(default=60, ge=5)
+    duracion: Optional[int] = Field(default=None, ge=5)
     video: str = "/videos/101.mp4"
     cuestionarios: list[PreguntaInput] = Field(default_factory=list)
 
@@ -90,6 +90,7 @@ class GuardarAvanceRequest(BaseModel):
     cursoId: int
     leccionId: int
     segundo: int = Field(..., ge=0)
+    duracionReal: Optional[int] = Field(default=None, ge=1)
 
 
 class ResponderPreguntaRequest(BaseModel):
@@ -102,6 +103,7 @@ class ResponderPreguntaRequest(BaseModel):
 class CompletarLeccionRequest(BaseModel):
     cursoId: int
     leccionId: int
+    duracionReal: Optional[int] = Field(default=None, ge=1)
 
 
 class SolicitarAccesoRequest(BaseModel):

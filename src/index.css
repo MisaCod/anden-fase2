@@ -3554,3 +3554,29 @@ a.parada-titulo:hover {
   font-size: 28px;
   margin-bottom: 6px;
 }
+
+/* ===== Badges de duración automática y cursos de solo lectura para otros profesores ===== */
+.badge-duracion-auto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eaf2f0;
+  color: var(--tinta);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.etiqueta-solo-lectura {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f1f4f3;
+  color: var(--gris);
+  border: 1px solid var(--via);
+}

@@ -144,7 +144,7 @@ function Admin() {
     {
       id: null,
       titulo: 'Módulo 1: Fundamentos',
-      lecciones: [{ id: null, titulo: 'Introducción al curso', duracion: 60, video: '/videos/101.mp4' }],
+      lecciones: [{ id: null, titulo: 'Introducción al curso', duracion: null, video: '/videos/101.mp4' }],
     },
   ])
   const [errores, setErrores] = useState({})
@@ -193,14 +193,20 @@ function Admin() {
   const [mensajeUsuario, setMensajeUsuario] = useState('')
   const [errorUsuario, setErrorUsuario] = useState('')
 
-  // Sincronizar cursoVideoId cuando cargan los cursos
-  useEffect(() => {
-    if (cursos.length > 0 && !cursos.some((c) => c.id === Number(cursoVideoId))) {
-      setCursoVideoId(cursos[0].id)
-    }
-  }, [cursos, cursoVideoId])
+  const cursosEditables = useMemo(
+    () => (esAdminGeneral ? cursos : cursos.filter((c) => c.puedeEditar)),
+    [cursos, esAdminGeneral]
+  )
 
-  const cursoParaVideo = cursos.find((c) => Number(c.id) === Number(cursoVideoId)) || cursos[0]
+  // Sincronizar cursoVideoId cuando cargan los cursos editables por este usuario
+  useEffect(() => {
+    if (cursosEditables.length > 0 && !cursosEditables.some((c) => c.id === Number(cursoVideoId))) {
+      setCursoVideoId(cursosEditables[0].id)
+    }
+  }, [cursosEditables, cursoVideoId])
+
+  const cursoParaVideo =
+    cursosEditables.find((c) => Number(c.id) === Number(cursoVideoId)) || cursosEditables[0] || null
   const leccionesCursoVideo = cursoParaVideo ? leccionesDe(cursoParaVideo) : []
   const modulosCursoVideo = useMemo(
     () => (cursoParaVideo ? cursoParaVideo.modulos : []),
@@ -288,7 +294,7 @@ function Admin() {
       {
         id: null,
         titulo: `Módulo ${prev.length + 1}: Nuevo tema`,
-        lecciones: [{ id: null, titulo: 'Nueva lección', duracion: 60, video: '/videos/101.mp4' }],
+        lecciones: [{ id: null, titulo: 'Nueva lección', duracion: null, video: '/videos/101.mp4' }],
       },
     ])
   }
@@ -313,7 +319,7 @@ function Admin() {
       copia[mIndex].lecciones.push({
         id: null,
         titulo: `Lección ${n}`,
-        duracion: 60,
+        duracion: null,
         video: '/videos/101.mp4',
       })
       return copia
@@ -353,7 +359,7 @@ function Admin() {
       {
         id: null,
         titulo: 'Módulo 1: Fundamentos',
-        lecciones: [{ id: null, titulo: 'Introducción al curso', duracion: 60, video: '/videos/101.mp4' }],
+        lecciones: [{ id: null, titulo: 'Introducción al curso', duracion: null, video: '/videos/101.mp4' }],
       },
     ])
     setErrores({})
@@ -427,7 +433,7 @@ function Admin() {
         lecciones: m.lecciones.map((l) => ({
           id: l.id || null,
           titulo: l.titulo.trim() || 'Lección',
-          duracion: Math.max(5, Number(l.duracion) || 60),
+          duracion: l.id && l.duracion ? Number(l.duracion) : null,
           video: l.video || '/videos/101.mp4',
         })),
       })),
@@ -766,7 +772,7 @@ function Admin() {
   const videoPreviewSrc = previsualizacionUrl || videoActualReferencia || ''
   const solicitudesPendientes = solicitudes.filter((s) => s.estado === 'pendiente').length
   const estudiantesLista = usuariosLista.filter((u) => u.rol === 'estudiante')
-  const cursosRestringidos = cursos.filter((c) => c.tipoAcceso === 'restringido')
+  const cursosRestringidos = cursosEditables.filter((c) => c.tipoAcceso === 'restringido')
 
   return (
     <div className="admin-layout">
@@ -1017,7 +1023,12 @@ function Admin() {
 
                 <div className="campo-grupo">
                   <div className="seccion-subcabecera">
-                    <h3>Módulos y lecciones</h3>
+                    <div>
+                      <h3>Módulos y lecciones</h3>
+                      <p className="texto-suave" style={{ fontSize: '12px' }}>
+                        La duración de cada lección se detecta automáticamente según su video real.
+                      </p>
+                    </div>
                     <button type="button" className="boton boton-claro" onClick={agregarModulo}>
                       + Módulo
                     </button>
@@ -1053,14 +1064,12 @@ function Admin() {
                             onChange={(e) => cambiarLeccion(mIdx, lIdx, 'titulo', e.target.value)}
                             placeholder="Título de lección"
                           />
-                          <input
-                            type="number"
-                            min="5"
-                            className="campo-input input-duracion-mini"
-                            value={l.duracion}
-                            onChange={(e) => cambiarLeccion(mIdx, lIdx, 'duracion', Number(e.target.value))}
-                            title="Duración en segundos"
-                          />
+                          <span
+                            className="badge-duracion-auto"
+                            title="La duración se calcula automáticamente al cargar el video real"
+                          >
+                            {l.id && l.duracion ? formatoTiempo(l.duracion) : 'Auto'}
+                          </span>
                           {m.lecciones.length > 1 && (
                             <button
                               type="button"
@@ -1143,42 +1152,49 @@ function Admin() {
                         <p className="texto-suave">
                           {c.categoria} · {leccionesDe(c).length} lecciones · Cert. ≥ {c.umbralCertificado}%
                           {c.prerequisitoTitulo ? ` · Requiere: ${c.prerequisitoTitulo}` : ''}
+                          {c.creadoPorNombre ? ` · Autor: ${c.creadoPorNombre}` : ''}
                         </p>
                       </div>
 
                       <div className="admin-curso-acciones">
-                        <button type="button" className="boton boton-claro" onClick={() => iniciarEdicionCurso(c)}>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="boton boton-claro"
-                          onClick={() => {
-                            setCursoVideoId(c.id)
-                            setModoAsignacion('existente')
-                            const primera = leccionesDe(c)[0]
-                            if (primera) cargarLeccionEnEditor(primera)
-                            setPestanaActiva('videos')
-                          }}
-                        >
-                          Videos
-                        </button>
-                        {confirmandoEliminarId === c.id ? (
-                          <button
-                            type="button"
-                            className="boton-eliminar-item"
-                            onClick={() => handleConfirmarEliminar(c.id)}
-                          >
-                            Confirmar
-                          </button>
+                        {c.puedeEditar ? (
+                          <>
+                            <button type="button" className="boton boton-claro" onClick={() => iniciarEdicionCurso(c)}>
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="boton boton-claro"
+                              onClick={() => {
+                                setCursoVideoId(c.id)
+                                setModoAsignacion('existente')
+                                const primera = leccionesDe(c)[0]
+                                if (primera) cargarLeccionEnEditor(primera)
+                                setPestanaActiva('videos')
+                              }}
+                            >
+                              Videos
+                            </button>
+                            {confirmandoEliminarId === c.id ? (
+                              <button
+                                type="button"
+                                className="boton-eliminar-item"
+                                onClick={() => handleConfirmarEliminar(c.id)}
+                              >
+                                Confirmar
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="boton-eliminar-item"
+                                onClick={() => setConfirmandoEliminarId(c.id)}
+                              >
+                                Eliminar
+                              </button>
+                            )}
+                          </>
                         ) : (
-                          <button
-                            type="button"
-                            className="boton-eliminar-item"
-                            onClick={() => setConfirmandoEliminarId(c.id)}
-                          >
-                            Eliminar
-                          </button>
+                          <span className="etiqueta-solo-lectura">Solo lectura · otro profesor</span>
                         )}
                       </div>
                     </div>
@@ -1200,6 +1216,11 @@ function Admin() {
             {mensajeExitoVideo && <div className="alerta-exito">{mensajeExitoVideo}</div>}
             {erroresVideo.general && <div className="alerta-error">{erroresVideo.general}</div>}
 
+            {cursosEditables.length === 0 ? (
+              <div className="alerta-info">
+                Todavía no tienes cursos propios creados. Crea tu primer curso en la pestaña <strong>Cursos</strong> para subirle videos y checkpoints.
+              </div>
+            ) : (
             <form onSubmit={handleGuardarVideoYCheckpoints} className="admin-formulario">
               <div className="admin-form-fila">
                 <div className="campo-grupo">
@@ -1211,12 +1232,12 @@ function Admin() {
                     onChange={(e) => {
                       const nuevoCursoId = Number(e.target.value)
                       setCursoVideoId(nuevoCursoId)
-                      const c = cursos.find((x) => x.id === nuevoCursoId)
+                      const c = cursosEditables.find((x) => x.id === nuevoCursoId)
                       const primera = c ? leccionesDe(c)[0] : null
                       if (primera && modoAsignacion === 'existente') cargarLeccionEnEditor(primera)
                     }}
                   >
-                    {cursos.map((c) => (
+                    {cursosEditables.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.titulo} ({c.categoria})
                       </option>
@@ -1640,6 +1661,7 @@ function Admin() {
                 </button>
               </div>
             </form>
+            )}
           </div>
         )}
 

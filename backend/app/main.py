@@ -169,12 +169,25 @@ def _curso_completado_por_usuario(curso: Curso, mapa_lecciones: dict[int, Progre
     )
 
 
+def _verificar_propietario_o_admin(usuario: Usuario, curso: Curso) -> None:
+    """El admin general puede editar cualquier curso; un profesor solo los cursos que él creó."""
+    if usuario.rol == "admin_general":
+        return
+    if usuario.rol == "profesor" and curso.creado_por_id == usuario.id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Solo puedes modificar o gestionar los cursos que tú creaste.",
+    )
+
+
 def _serializar_curso_para_usuario(
     curso: Curso,
     usuario: Usuario,
     mapa_cursos: dict[int, Curso],
     mapa_inscripciones: dict[int, InscripcionAcceso],
     mapa_lecciones: dict[int, ProgresoLeccion],
+    mapa_autores: Optional[dict[int, str]] = None,
 ) -> dict:
     es_staff = usuario.rol in ROLES_STAFF
     insc = mapa_inscripciones.get(curso.id)
@@ -205,6 +218,13 @@ def _serializar_curso_para_usuario(
     else:
         prelacion_cumplida = _curso_completado_por_usuario(prereq_curso, mapa_lecciones)
 
+    puede_editar = usuario.rol == "admin_general" or (
+        usuario.rol == "profesor" and curso.creado_por_id == usuario.id
+    )
+    creado_por_nombre = (
+        (mapa_autores or {}).get(curso.creado_por_id) if curso.creado_por_id else None
+    )
+
     return {
         "id": curso.id,
         "titulo": curso.titulo,
@@ -217,6 +237,9 @@ def _serializar_curso_para_usuario(
         "umbralCertificado": int(curso.umbral_certificado or 70),
         "prerequisitoCursoId": curso.prerequisito_curso_id,
         "prerequisitoTitulo": prereq_curso.titulo if prereq_curso else None,
+        "creadoPorId": curso.creado_por_id,
+        "creadoPorNombre": creado_por_nombre,
+        "puedeEditar": puede_editar,
         "tieneAcceso": tiene_acceso,
         "estadoAcceso": estado_acceso,
         "prelacionCumplida": prelacion_cumplida,
@@ -230,7 +253,7 @@ def _serializar_curso_para_usuario(
                         "id": l.id,
                         "orden": l.orden,
                         "titulo": l.titulo,
-                        "duracion": int(l.duracion or 60),
+                        "duracion": int(l.duracion or 45),
                         "video": l.video_url,
                         "cuestionarios": [serializar_pregunta(q) for q in l.preguntas],
                     }
@@ -355,13 +378,14 @@ def listar_cursos(
 ):
     cursos = _cargar_cursos_completos(db)
     mapa_cursos = {c.id: c for c in cursos}
+    mapa_autores = {u.id: u.nombre for u in db.query(Usuario).all()}
     inscripciones = db.query(InscripcionAcceso).filter(InscripcionAcceso.usuario_id == usuario.id).all()
     mapa_insc = {i.curso_id: i for i in inscripciones}
     progs = db.query(ProgresoLeccion).filter(ProgresoLeccion.usuario_id == usuario.id).all()
     mapa_lecciones = {p.leccion_id: p for p in progs}
 
     return [
-        _serializar_curso_para_usuario(c, usuario, mapa_cursos, mapa_insc, mapa_lecciones)
+        _serializar_curso_para_usuario(c, usuario, mapa_cursos, mapa_insc, mapa_lecciones, mapa_autores)
         for c in cursos
     ]
 
@@ -400,7 +424,7 @@ def crear_curso(
         m = Modulo(curso_id=curso.id, orden=1, titulo="Módulo 1: Fundamentos")
         db.add(m)
         db.flush()
-        db.add(Leccion(modulo_id=m.id, orden=1, titulo="Introducción al curso", duracion=60, video_url="/videos/101.mp4"))
+        db.add(Leccion(modulo_id=m.id, orden=1, titulo="Introducción al curso", duracion=45, video_url="/videos/101.mp4"))
     else:
         for m_idx, m_in in enumerate(modulos_input, start=1):
             m = Modulo(curso_id=curso.id, orden=m_idx, titulo=m_in.titulo.strip())
@@ -412,7 +436,7 @@ def crear_curso(
                     modulo_id=m.id,
                     orden=l_idx,
                     titulo=l_in.titulo.strip(),
-                    duracion=max(5, int(l_in.duracion or 60)),
+                    duracion=max(5, int(l_in.duracion)) if l_in.duracion else 45,
                     video_url=l_in.video or "/videos/101.mp4",
                 )
                 db.add(lecc)
@@ -436,8 +460,9 @@ def crear_curso(
     db.commit()
     cursos = _cargar_cursos_completos(db)
     mapa_cursos = {c.id: c for c in cursos}
+    mapa_autores = {u.id: u.nombre for u in db.query(Usuario).all()}
     creado = mapa_cursos[curso.id]
-    return _serializar_curso_para_usuario(creado, usuario, mapa_cursos, {}, {})
+    return _serializar_curso_para_usuario(creado, usuario, mapa_cursos, {}, {}, mapa_autores)
 
 
 @app.put("/api/cursos/{curso_id}")
@@ -455,6 +480,7 @@ def editar_curso(
     )
     if not curso:
         raise HTTPException(status_code=404, detail="Curso no encontrado.")
+    _verificar_propietario_o_admin(usuario, curso)
 
     if body.prerequisitoCursoId is not None:
         if body.prerequisitoCursoId == curso_id:
@@ -475,7 +501,7 @@ def editar_curso(
     curso.umbral_certificado = body.umbralCertificado
     curso.prerequisito_curso_id = body.prerequisitoCursoId
 
-    # Sincronizar módulos y lecciones preservando IDs existentes (para no perder progreso/videos/preguntas)
+    # Sincronizar módulos y lecciones preservando IDs y duraciones reales de video
     if body.modulos:
         modulos_existentes = {m.id: m for m in curso.modulos}
         lecciones_existentes = {l.id: l for m in curso.modulos for l in m.lecciones}
@@ -498,8 +524,10 @@ def editar_curso(
                     l_obj = lecciones_existentes[l_in.id]
                     l_obj.modulo_id = m_obj.id
                     l_obj.titulo = l_in.titulo.strip()
-                    l_obj.duracion = max(5, int(l_in.duracion or 60))
                     l_obj.orden = l_idx
+                    # Conservar la duración real del video; solo actualizar si no tenía
+                    if not l_obj.duracion:
+                        l_obj.duracion = max(5, int(l_in.duracion)) if l_in.duracion else 45
                     if l_in.video:
                         l_obj.video_url = l_in.video
                 else:
@@ -507,7 +535,7 @@ def editar_curso(
                         modulo_id=m_obj.id,
                         orden=l_idx,
                         titulo=l_in.titulo.strip(),
-                        duracion=max(5, int(l_in.duracion or 60)),
+                        duracion=max(5, int(l_in.duracion)) if l_in.duracion else 45,
                         video_url=l_in.video or "/videos/101.mp4",
                     )
                     db.add(l_obj)
@@ -524,18 +552,20 @@ def editar_curso(
     db.commit()
     cursos = _cargar_cursos_completos(db)
     mapa_cursos = {c.id: c for c in cursos}
-    return _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {})
+    mapa_autores = {u.id: u.nombre for u in db.query(Usuario).all()}
+    return _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}, mapa_autores)
 
 
 @app.delete("/api/cursos/{curso_id}")
 def eliminar_curso(
     curso_id: int,
-    _usuario: Usuario = Depends(requerir_profesor_o_admin),
+    usuario: Usuario = Depends(requerir_profesor_o_admin),
     db: Session = Depends(get_db),
 ):
     curso = db.get(Curso, curso_id)
     if not curso:
         raise HTTPException(status_code=404, detail="Curso no encontrado.")
+    _verificar_propietario_o_admin(usuario, curso)
     # Desvincular prelaciones que apuntaran a este curso
     db.query(Curso).filter(Curso.prerequisito_curso_id == curso_id).update({Curso.prerequisito_curso_id: None})
     db.delete(curso)
@@ -558,11 +588,12 @@ def agregar_leccion_con_video(
     )
     if not curso:
         raise HTTPException(status_code=404, detail="Curso no encontrado.")
+    _verificar_propietario_o_admin(usuario, curso)
     if not curso.modulos:
         raise HTTPException(status_code=400, detail="El curso no tiene módulos configurados.")
 
     modulo = next((m for m in curso.modulos if body.moduloId and m.id == body.moduloId), curso.modulos[0])
-    duracion = max(5, int(body.duracion or 60))
+    duracion = max(5, int(body.duracion or 45))
 
     for q in body.cuestionarios:
         if q.segundo >= duracion:
@@ -595,10 +626,11 @@ def agregar_leccion_con_video(
     db.commit()
     cursos = _cargar_cursos_completos(db)
     mapa_cursos = {c.id: c for c in cursos}
+    mapa_autores = {u.id: u.nombre for u in db.query(Usuario).all()}
     return {
         "ok": True,
         "leccionId": nueva.id,
-        "curso": _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}),
+        "curso": _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}, mapa_autores),
     }
 
 
@@ -617,6 +649,10 @@ def actualizar_video_leccion(
     )
     if not leccion:
         raise HTTPException(status_code=404, detail="Lección no encontrada.")
+    curso_padre = db.get(Curso, leccion.modulo.curso_id)
+    if not curso_padre:
+        raise HTTPException(status_code=404, detail="Curso no encontrado.")
+    _verificar_propietario_o_admin(usuario, curso_padre)
 
     duracion_final = max(5, int(body.duracion or leccion.duracion or 60))
     for q in body.cuestionarios:
@@ -663,9 +699,10 @@ def actualizar_video_leccion(
     db.commit()
     cursos = _cargar_cursos_completos(db)
     mapa_cursos = {c.id: c for c in cursos}
+    mapa_autores = {u.id: u.nombre for u in db.query(Usuario).all()}
     return {
         "ok": True,
-        "curso": _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}),
+        "curso": _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}, mapa_autores),
     }
 
 
@@ -872,6 +909,12 @@ def guardar_avance(
     if not leccion:
         raise HTTPException(status_code=404, detail="Lección no encontrada.")
 
+    # Sincronizar automáticamente la duración real reportada por el <video> del navegador
+    if body.duracionReal and body.duracionReal > 0 and int(leccion.duracion or 0) != int(body.duracionReal):
+        leccion.duracion = int(body.duracionReal)
+
+    duracion_efectiva = max(int(body.duracionReal or 0), int(leccion.duracion or 0), int(body.segundo))
+
     pu = asegurar_progreso_usuario(db, usuario.id)
     pu.ultima_curso_id = body.cursoId
     pu.ultima_leccion_id = body.leccionId
@@ -882,12 +925,12 @@ def guardar_avance(
         .first()
     )
     if pl:
-        pl.maximo = max(int(pl.maximo or 0), min(body.segundo, int(leccion.duracion or body.segundo)))
+        pl.maximo = max(int(pl.maximo or 0), min(body.segundo, duracion_efectiva))
     else:
         pl = ProgresoLeccion(
             usuario_id=usuario.id,
             leccion_id=body.leccionId,
-            maximo=min(body.segundo, int(leccion.duracion or body.segundo)),
+            maximo=min(body.segundo, duracion_efectiva),
             completada=False,
         )
         db.add(pl)
@@ -997,6 +1040,9 @@ def completar_leccion(
     leccion = next((l for l in lecciones_curso if l.id == body.leccionId), None)
     if not leccion:
         raise HTTPException(status_code=404, detail="Lección no encontrada en este curso.")
+
+    if body.duracionReal and body.duracionReal > 0 and int(leccion.duracion or 0) != int(body.duracionReal):
+        leccion.duracion = int(body.duracionReal)
 
     pu = asegurar_progreso_usuario(db, usuario.id)
     registrar_actividad_hoy(db, usuario.id)
@@ -1154,7 +1200,7 @@ def verificar_certificado_publico(codigo: str, db: Session = Depends(get_db)):
 # =============================================================================
 @app.get("/api/admin/solicitudes")
 def listar_solicitudes(
-    _usuario: Usuario = Depends(requerir_profesor_o_admin),
+    usuario: Usuario = Depends(requerir_profesor_o_admin),
     db: Session = Depends(get_db),
 ):
     inscripciones = db.query(InscripcionAcceso).order_by(InscripcionAcceso.actualizado_en.desc()).all()
@@ -1166,6 +1212,9 @@ def listar_solicitudes(
         est = usuarios.get(i.usuario_id)
         cur = cursos.get(i.curso_id)
         if not est or not cur:
+            continue
+        # Un profesor solo ve las solicitudes de sus propios cursos
+        if usuario.rol == "profesor" and cur.creado_por_id != usuario.id:
             continue
         salida.append(
             {
@@ -1200,6 +1249,9 @@ def resolver_solicitud(
     insc = db.get(InscripcionAcceso, inscripcion_id)
     if not insc:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+    curso = db.get(Curso, insc.curso_id)
+    if curso:
+        _verificar_propietario_o_admin(usuario, curso)
     insc.estado = body.estado
     insc.aprobado_por_id = usuario.id
     insc.actualizado_en = datetime.now(timezone.utc)
@@ -1217,6 +1269,7 @@ def otorgar_acceso_manual(
     cur = db.get(Curso, body.cursoId)
     if not est or not cur:
         raise HTTPException(status_code=404, detail="Usuario o curso no encontrado.")
+    _verificar_propietario_o_admin(usuario, cur)
 
     insc = (
         db.query(InscripcionAcceso)

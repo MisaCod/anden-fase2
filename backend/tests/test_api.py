@@ -279,3 +279,146 @@ def test_crud_curso_con_prelacion_y_repaso_mejora_puntaje(client: TestClient):
     assert r_rep.json()["xpGanado"] == 0
     assert r_rep.json()["progreso"]["xp"] == xp_antes
     assert r_rep.json()["progreso"]["respuestas"][str(q_unica["id"])]["puntaje"] == 1.0
+
+
+def test_aislamiento_entre_profesores_y_admin_general(client: TestClient):
+    h_admin = _auth_headers(client, "admin")
+    h_profe1 = _auth_headers(client, "profe")
+
+    # Admin general crea un segundo profesor
+    r_p2 = client.post(
+        "/api/admin/usuarios",
+        headers=h_admin,
+        json={
+            "username": "profe_dos",
+            "nombre": "Prof. Segundo",
+            "password": "1234",
+            "rol": "profesor",
+        },
+    )
+    assert r_p2.status_code == 201, r_p2.text
+    h_profe2 = _auth_headers(client, "profe_dos")
+
+    # profe_dos crea su propio curso restringido
+    r_curso = client.post(
+        "/api/cursos",
+        headers=h_profe2,
+        json={
+            "titulo": "Curso Exclusivo Profe 2",
+            "categoria": "Programación",
+            "nivel": "Intermedio",
+            "descripcion": "Curso creado únicamente por el profesor 2.",
+            "color": "#2563eb",
+            "tipoAcceso": "restringido",
+            "precio": 10.0,
+            "modulos": [
+                {
+                    "titulo": "Módulo 1",
+                    "lecciones": [{"titulo": "Tema inicial", "video": "/videos/101.mp4"}],
+                }
+            ],
+        },
+    )
+    assert r_curso.status_code == 201, r_curso.text
+    curso_p2_id = r_curso.json()["id"]
+    leccion_p2_id = r_curso.json()["modulos"][0]["lecciones"][0]["id"]
+    assert r_curso.json()["puedeEditar"] is True
+
+    # Para profe1, ese curso debe aparecer como puedeEditar=False
+    cursos_p1 = client.get("/api/cursos", headers=h_profe1).json()
+    c_visto_p1 = next(c for c in cursos_p1 if c["id"] == curso_p2_id)
+    assert c_visto_p1["puedeEditar"] is False
+
+    # profe1 NO puede editar, agregar lección, editar video ni eliminar el curso de profe_dos (403)
+    assert client.put(
+        f"/api/cursos/{curso_p2_id}",
+        headers=h_profe1,
+        json={
+            "titulo": "Intento hack",
+            "categoria": "Programación",
+            "nivel": "Intermedio",
+            "descripcion": "No debería dejar",
+            "color": "#2563eb",
+            "tipoAcceso": "gratis",
+            "modulos": [],
+        },
+    ).status_code == 403
+    assert client.put(
+        f"/api/lecciones/{leccion_p2_id}",
+        headers=h_profe1,
+        json={"duracion": 45, "cuestionarios": []},
+    ).status_code == 403
+    assert client.delete(f"/api/cursos/{curso_p2_id}", headers=h_profe1).status_code == 403
+
+    # profe_dos SÍ puede editar su propio curso, y admin_general puede eliminarlo al final
+    assert client.put(
+        f"/api/lecciones/{leccion_p2_id}",
+        headers=h_profe2,
+        json={"duracion": 45, "cuestionarios": []},
+    ).status_code == 200
+    assert client.delete(f"/api/cursos/{curso_p2_id}", headers=h_admin).status_code == 200
+
+
+def test_duracion_real_automatica_no_trunca_progreso(client: TestClient):
+    h_profe = _auth_headers(client, "profe")
+    h_est = _auth_headers(client, "camila_test", "clave123")
+
+    # Crear curso sin enviar duración manual (backend asigna default y luego sincroniza con duracionReal)
+    r_curso = client.post(
+        "/api/cursos",
+        headers=h_profe,
+        json={
+            "titulo": "Curso Duracion Auto",
+            "categoria": "Datos",
+            "nivel": "Principiante",
+            "descripcion": "Verifica que la duración real del video mande siempre.",
+            "color": "#2f6f73",
+            "tipoAcceso": "gratis",
+            "modulos": [
+                {
+                    "titulo": "Módulo 1",
+                    "lecciones": [
+                        {"titulo": "Lección larga", "duracion": 10, "video": "/videos/101.mp4"},
+                        {"titulo": "Lección siguiente", "video": "/videos/102.mp4"},
+                    ],
+                }
+            ],
+        },
+    )
+    assert r_curso.status_code == 201, r_curso.text
+    cid = r_curso.json()["id"]
+    lid1 = r_curso.json()["modulos"][0]["lecciones"][0]["id"]
+
+    # El video real dura 45s y el estudiante ya va por el segundo 35: NO debe truncarse en 10s
+    r_av = client.post(
+        "/api/progreso/avance",
+        headers=h_est,
+        json={"cursoId": cid, "leccionId": lid1, "segundo": 35, "duracionReal": 45},
+    )
+    assert r_av.status_code == 200
+    assert r_av.json()["lecciones"][str(lid1)]["maximo"] == 35
+
+    # Y la lección en SQLite debe haberse sincronizado a 45s
+    cursos_after = client.get("/api/cursos", headers=h_est).json()
+    c_after = next(c for c in cursos_after if c["id"] == cid)
+    assert c_after["modulos"][0]["lecciones"][0]["duracion"] == 45
+
+    # Completar lección 1 marca completada=True y un avance tardío nunca la revierte a False
+    r_comp = client.post(
+        "/api/progreso/completar-leccion",
+        headers=h_est,
+        json={"cursoId": cid, "leccionId": lid1, "duracionReal": 45},
+    )
+    assert r_comp.status_code == 200
+    assert r_comp.json()["progreso"]["lecciones"][str(lid1)]["completada"] is True
+
+    r_late = client.post(
+        "/api/progreso/avance",
+        headers=h_est,
+        json={"cursoId": cid, "leccionId": lid1, "segundo": 44, "duracionReal": 45},
+    )
+    assert r_late.status_code == 200
+    assert r_late.json()["lecciones"][str(lid1)]["completada"] is True
+
+    # Limpieza
+    assert client.delete(f"/api/cursos/{cid}", headers=h_profe).status_code == 200

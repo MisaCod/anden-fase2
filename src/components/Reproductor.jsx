@@ -18,6 +18,7 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
 
   const videoRef = useRef(null)
   const reproductorRef = useRef(null)
+  const completandoRef = useRef(false)
 
   const [videoSrc, setVideoSrc] = useState(leccion.video)
   const [reproduciendo, setReproduciendo] = useState(false)
@@ -26,6 +27,7 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
   const [preguntaActiva, setPreguntaActiva] = useState(null)
   const [respondidasEnRepaso, setRespondidasEnRepaso] = useState([])
   const [terminada, setTerminada] = useState(null) // null, 'nueva' o 'repaso'
+  const [guardandoFinal, setGuardandoFinal] = useState(false)
   const [reanudado, setReanudado] = useState(0)
   const [pantallaCompleta, setPantallaCompleta] = useState(false)
 
@@ -106,7 +108,10 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
   }, [leccion.video])
 
   const avance = avanceDe(progreso, leccion.id)
-  const limite = limiteDeAvance(leccion, progreso)
+  // Usar la duración real del video cargado para no truncar el límite si el curso traía una duración vieja
+  const limite = avance.completada
+    ? Math.max(Number(duracion) || 0, Number(leccion.duracion) || 0)
+    : limiteDeAvance(leccion, progreso)
 
   function buscarPreguntaPendiente(ahora) {
     if (modoRepaso) {
@@ -126,18 +131,19 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
 
   function alCargar() {
     const video = videoRef.current
-    if (video.duration && !Number.isNaN(video.duration)) {
-      setDuracion(video.duration)
-    }
+    const durReal = video.duration && !Number.isNaN(video.duration) ? video.duration : leccion.duracion
+    setDuracion(durReal)
     if (!modoRepaso && !avance.completada && avance.maximo > 0) {
-      video.currentTime = avance.maximo
-      setTiempo(avance.maximo)
-      setReanudado(avance.maximo)
+      const punto = Math.min(avance.maximo, Math.max(0, durReal - 1))
+      video.currentTime = punto
+      setTiempo(punto)
+      setReanudado(punto)
     }
   }
 
   function alAvanzar() {
     const video = videoRef.current
+    if (!video || completandoRef.current || video.ended) return
     const ahora = video.currentTime
     setTiempo(ahora)
 
@@ -151,8 +157,10 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
     }
 
     const segundo = Math.floor(ahora)
-    if (!avance.completada && segundo > avance.maximo) {
-      guardarAvance(curso.id, leccion.id, segundo)
+    const durReal = Math.round(video.duration || duracion || leccion.duracion)
+    // No disparar /avance en el último segundo (evita carrera con onEnded -> /completar-leccion)
+    if (!avance.completada && segundo > avance.maximo && segundo < Math.max(1, durReal)) {
+      guardarAvance(curso.id, leccion.id, segundo, durReal)
     }
   }
 
@@ -173,20 +181,28 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
       videoRef.current.pause()
       return
     }
+    completandoRef.current = false
     setTerminada(null)
     setReproduciendo(true)
   }
 
   async function alTerminar() {
-    const pendiente = buscarPreguntaPendiente(duracion)
+    const video = videoRef.current
+    const durReal = Math.round((video && video.duration) || duracion || leccion.duracion)
+    const pendiente = buscarPreguntaPendiente(durReal)
     if (pendiente) {
       setPreguntaActiva(pendiente)
       return
     }
+
+    completandoRef.current = true
     const eraRepaso = avance.completada
     setTerminada(eraRepaso ? 'repaso' : 'nueva')
+
     if (!eraRepaso) {
-      await completarLeccion(curso, leccion)
+      setGuardandoFinal(true)
+      await completarLeccion(curso, leccion, durReal)
+      setGuardandoFinal(false)
     }
   }
 
@@ -205,6 +221,7 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
 
   function verDeNuevo() {
     const video = videoRef.current
+    completandoRef.current = false
     setTerminada(null)
     setRespondidasEnRepaso([])
     video.currentTime = 0
@@ -271,7 +288,11 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
                 </p>
               )}
               <div className="botones">
-                {esUltima && certCurso ? (
+                {guardandoFinal ? (
+                  <button type="button" className="boton" disabled>
+                    Guardando progreso…
+                  </button>
+                ) : esUltima && certCurso ? (
                   <Link to={'/certificado/' + curso.id} className="boton">
                     Ver mi certificado
                   </Link>
@@ -282,7 +303,12 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
                     Siguiente lección
                   </Link>
                 )}
-                <button type="button" className="boton boton-claro" onClick={verDeNuevo}>
+                <button
+                  type="button"
+                  className="boton boton-claro"
+                  onClick={verDeNuevo}
+                  disabled={guardandoFinal}
+                >
                   Ver de nuevo
                 </button>
               </div>
@@ -302,8 +328,8 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
           </button>
 
           <div className="linea-tiempo">
-            <div className="linea-tiempo-limite" style={{ width: (limite / (duracion || 1)) * 100 + '%' }}></div>
-            <div className="linea-tiempo-visto" style={{ width: (tiempo / (duracion || 1)) * 100 + '%' }}></div>
+            <div className="linea-tiempo-limite" style={{ width: Math.min(100, (limite / (duracion || 1)) * 100) + '%' }}></div>
+            <div className="linea-tiempo-visto" style={{ width: Math.min(100, (tiempo / (duracion || 1)) * 100) + '%' }}></div>
 
             {(leccion.cuestionarios || []).map((c) => {
               const respondida = modoRepaso
