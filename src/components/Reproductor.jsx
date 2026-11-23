@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Cuestionario from './Cuestionario.jsx'
 import { useProgreso } from '../contextos/ProgresoContext.jsx'
@@ -11,6 +11,29 @@ import {
   preguntaPendiente,
   preguntaRespondida,
 } from '../logica/progreso.js'
+
+const CLAVE_VOLUMEN = 'anden-volumen'
+const CLAVE_SILENCIADO = 'anden-silenciado'
+
+function leerVolumenInicial() {
+  try {
+    const guardado = localStorage.getItem(CLAVE_VOLUMEN)
+    if (guardado === null) return 1
+    const numero = Number(guardado)
+    if (Number.isNaN(numero)) return 1
+    return Math.min(1, Math.max(0, numero))
+  } catch {
+    return 1
+  }
+}
+
+function leerSilenciadoInicial() {
+  try {
+    return localStorage.getItem(CLAVE_SILENCIADO) === 'true'
+  } catch {
+    return false
+  }
+}
 
 function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
   const { progreso, guardarAvance, responder, completarLeccion, estadisticasPorCurso, certificados } =
@@ -30,6 +53,88 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
   const [guardandoFinal, setGuardandoFinal] = useState(false)
   const [reanudado, setReanudado] = useState(0)
   const [pantallaCompleta, setPantallaCompleta] = useState(false)
+  const [volumen, setVolumen] = useState(leerVolumenInicial)
+  const [silenciado, setSilenciado] = useState(leerSilenciadoInicial)
+
+  const volumenPrevioRef = useRef(volumen > 0 ? volumen : 1)
+  const volumenRef = useRef(volumen)
+  const silenciadoRef = useRef(silenciado)
+
+  useEffect(() => {
+    volumenRef.current = volumen
+    silenciadoRef.current = silenciado
+    const video = videoRef.current
+    if (video) {
+      video.volume = volumen
+      video.muted = silenciado || volumen === 0
+    }
+    try {
+      localStorage.setItem(CLAVE_VOLUMEN, String(volumen))
+      localStorage.setItem(CLAVE_SILENCIADO, String(silenciado))
+    } catch {
+      // Ignorar si localStorage no está disponible
+    }
+  }, [volumen, silenciado, videoSrc])
+
+  const aplicarVolumen = useCallback((nuevoVolumen) => {
+    const clamped = Math.round(Math.min(1, Math.max(0, Number(nuevoVolumen))) * 100) / 100
+    setVolumen(clamped)
+    if (clamped > 0) {
+      volumenPrevioRef.current = clamped
+      setSilenciado(false)
+    } else {
+      setSilenciado(true)
+    }
+    const video = videoRef.current
+    if (video) {
+      video.volume = clamped
+      video.muted = clamped === 0
+    }
+  }, [])
+
+  const alternarSilencio = useCallback(() => {
+    const estaSilenciado = silenciadoRef.current || volumenRef.current === 0
+    if (estaSilenciado) {
+      const restaurado =
+        volumenRef.current > 0
+          ? volumenRef.current
+          : volumenPrevioRef.current > 0
+          ? volumenPrevioRef.current
+          : 1
+      setVolumen(restaurado)
+      setSilenciado(false)
+      const video = videoRef.current
+      if (video) {
+        video.volume = restaurado
+        video.muted = false
+      }
+    } else {
+      if (volumenRef.current > 0) {
+        volumenPrevioRef.current = volumenRef.current
+      }
+      setSilenciado(true)
+      const video = videoRef.current
+      if (video) {
+        video.muted = true
+      }
+    }
+  }, [])
+
+  function alCambiarVolumenSlider(evento) {
+    aplicarVolumen(evento.target.value)
+  }
+
+  function alCambiarVolumenNativo() {
+    const video = videoRef.current
+    if (!video) return
+    const volNativo = Math.round(Math.min(1, Math.max(0, video.volume)) * 100) / 100
+    const mutNativo = Boolean(video.muted || volNativo === 0)
+    if (volNativo > 0) {
+      volumenPrevioRef.current = volNativo
+    }
+    setVolumen((prev) => (prev !== volNativo ? volNativo : prev))
+    setSilenciado((prev) => (prev !== mutNativo ? mutNativo : prev))
+  }
 
   useEffect(() => {
     function alCambiarPantallaCompleta() {
@@ -57,16 +162,34 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
 
   useEffect(() => {
     function manejarTeclas(e) {
-      if (['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) return
+      const tag = e.target?.tagName
+      const esCampoTexto =
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        (tag === 'INPUT' && !['range', 'button', 'checkbox', 'radio'].includes(e.target?.type))
+      if (esCampoTexto) return
+
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault()
         alternarPantallaCompleta()
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault()
+        alternarSilencio()
+      } else if (
+        (e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+        e.target?.type !== 'range' &&
+        (document.fullscreenElement || reproductorRef.current?.contains(document.activeElement))
+      ) {
+        e.preventDefault()
+        const base = silenciadoRef.current ? 0 : volumenRef.current
+        const delta = e.key === 'ArrowUp' ? 0.1 : -0.1
+        aplicarVolumen(base + delta)
       }
     }
 
     window.addEventListener('keydown', manejarTeclas)
     return () => window.removeEventListener('keydown', manejarTeclas)
-  }, [])
+  }, [alternarSilencio, aplicarVolumen])
 
   function alternarPantallaCompleta() {
     const el = reproductorRef.current
@@ -131,6 +254,8 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
 
   function alCargar() {
     const video = videoRef.current
+    video.volume = volumenRef.current
+    video.muted = silenciadoRef.current || volumenRef.current === 0
     const durReal = video.duration && !Number.isNaN(video.duration) ? video.duration : leccion.duracion
     setDuracion(durReal)
     if (!modoRepaso && !avance.completada && avance.maximo > 0) {
@@ -231,6 +356,9 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
   const esUltima = !siguiente
   const statsCurso = estadisticasPorCurso[String(curso.id)]
   const certCurso = certificados.find((c) => c.cursoId === curso.id)
+  const estaSilenciado = silenciado || volumen === 0
+  const volumenEfectivo = estaSilenciado ? 0 : volumen
+  const porcentajeVolumen = Math.round(volumenEfectivo * 100)
 
   return (
     <>
@@ -250,6 +378,7 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
             onPlay={alReproducir}
             onPause={() => setReproduciendo(false)}
             onSeeking={alBuscar}
+            onVolumeChange={alCambiarVolumenNativo}
             onEnded={alTerminar}
           ></video>
 
@@ -361,6 +490,79 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
           <span className="tiempo">
             {formatoTiempo(tiempo)} / {formatoTiempo(duracion)}
           </span>
+
+          <div className="control-volumen">
+            <button
+              type="button"
+              className="control control-icono"
+              onClick={alternarSilencio}
+              aria-label={estaSilenciado ? 'Activar sonido' : 'Silenciar'}
+              title={estaSilenciado ? 'Activar sonido (m)' : 'Silenciar (m)'}
+            >
+              {estaSilenciado ? (
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </svg>
+              ) : volumenEfectivo <= 0.5 ? (
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </svg>
+              ) : (
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                </svg>
+              )}
+            </button>
+
+            <input
+              type="range"
+              className="volumen-slider"
+              min="0"
+              max="1"
+              step="0.05"
+              value={volumenEfectivo}
+              onChange={alCambiarVolumenSlider}
+              style={{ '--volumen-pct': `${porcentajeVolumen}%` }}
+              aria-label="Volumen"
+              aria-valuetext={estaSilenciado ? 'Silenciado' : `${porcentajeVolumen}%`}
+              title={`Volumen: ${porcentajeVolumen}%`}
+            />
+          </div>
 
           <button
             type="button"

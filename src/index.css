@@ -725,7 +725,8 @@ a.parada-titulo:hover {
   cursor: not-allowed;
 }
 
-.control-fullscreen {
+.control-fullscreen,
+.control-icono {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -736,9 +737,74 @@ a.parada-titulo:hover {
   transition: transform 0.15s, color 0.15s;
 }
 
-.control-fullscreen:hover {
+.control-fullscreen:hover,
+.control-icono:hover {
   color: var(--acento);
   transform: scale(1.15);
+}
+
+.control-volumen {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.volumen-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 78px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--acento) 0%,
+    var(--acento) var(--volumen-pct, 100%),
+    rgba(255, 255, 255, 0.24) var(--volumen-pct, 100%),
+    rgba(255, 255, 255, 0.24) 100%
+  );
+  cursor: pointer;
+  outline-offset: 4px;
+}
+
+.volumen-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--tinta);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.volumen-slider:hover::-webkit-slider-thumb,
+.volumen-slider:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.18);
+  background: var(--acento);
+}
+
+.volumen-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--tinta);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.volumen-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.volumen-slider:hover::-moz-range-thumb,
+.volumen-slider:focus-visible::-moz-range-thumb {
+  transform: scale(1.18);
+  background: var(--acento);
 }
 
 /* Pantalla completa para el reproductor */
@@ -872,6 +938,8 @@ a.parada-titulo:hover {
 .tiempo {
   font-size: 15px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .leyenda {
@@ -1218,6 +1286,20 @@ a.parada-titulo:hover {
   .capa-final {
     position: static;
     padding: 16px;
+  }
+
+  .controles {
+    gap: 10px;
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+
+  .tiempo {
+    font-size: 13px;
+  }
+
+  .volumen-slider {
+    width: 60px;
   }
 }
 
