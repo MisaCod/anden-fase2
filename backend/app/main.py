@@ -38,6 +38,7 @@ from .models import (
     ProgresoUsuario,
     RespuestaUsuario,
     Usuario,
+    ValoracionLeccion,
 )
 from .schemas import (
     ActualizarUsuarioAdminRequest,
@@ -55,6 +56,7 @@ from .schemas import (
     ResolverSolicitudRequest,
     ResponderPreguntaRequest,
     SolicitarAccesoRequest,
+    ValorarLeccionRequest,
 )
 from .security import (
     ROLES_STAFF,
@@ -97,8 +99,8 @@ app.add_middleware(
 )
 
 
-def _serializar_usuario(u: Usuario) -> dict:
-    return {
+def _serializar_usuario(u: Usuario, valoracion_docente: Optional[dict] = None) -> dict:
+    data = {
         "id": u.id,
         "username": u.username,
         "email": u.email,
@@ -109,6 +111,82 @@ def _serializar_usuario(u: Usuario) -> dict:
         "activo": bool(u.activo),
         "creadoEn": u.creado_en.isoformat() if u.creado_en else None,
     }
+    if valoracion_docente is not None:
+        data["valoracionDocente"] = valoracion_docente
+    return data
+
+
+def _calcular_valoraciones(
+    db: Session,
+    cursos: list[Curso],
+    usuario_id: Optional[int] = None,
+) -> dict:
+    """Calcula promedios de valoración por lección, curso y profesor (autor).
+
+    - Lección: promedio aritmético de todas las puntuaciones recibidas por ese video.
+    - Curso: promedio de la valoración de sus videos valorados.
+    - Profesor: promedio de la valoración de todos los videos de sus cursos.
+    """
+    rows = db.query(ValoracionLeccion).all()
+    agrupadas: dict[int, list[ValoracionLeccion]] = {}
+    for row in rows:
+        agrupadas.setdefault(row.leccion_id, []).append(row)
+
+    por_leccion: dict[int, dict] = {}
+    for lid, items in agrupadas.items():
+        mi_val = next((i.puntuacion for i in items if usuario_id and i.usuario_id == usuario_id), None)
+        promedio = round(sum(i.puntuacion for i in items) / len(items), 2)
+        por_leccion[lid] = {
+            "promedio": promedio,
+            "total": len(items),
+            "miValoracion": mi_val,
+        }
+
+    por_curso: dict[int, dict] = {}
+    videos_por_autor: dict[int, list[int]] = {}
+    for c in cursos:
+        lecciones_curso = [l for m in c.modulos for l in m.lecciones]
+        valoradas = [por_leccion[l.id] for l in lecciones_curso if l.id in por_leccion]
+        promedio_curso = (
+            round(sum(v["promedio"] for v in valoradas) / len(valoradas), 2) if valoradas else None
+        )
+        por_curso[c.id] = {
+            "promedio": promedio_curso,
+            "total": sum(v["total"] for v in valoradas),
+            "videosValorados": len(valoradas),
+        }
+        if c.creado_por_id:
+            videos_por_autor.setdefault(c.creado_por_id, []).extend(l.id for l in lecciones_curso)
+
+    por_autor: dict[int, dict] = {}
+    for autor_id, lids in videos_por_autor.items():
+        valoradas = [por_leccion[lid] for lid in lids if lid in por_leccion]
+        promedio_autor = (
+            round(sum(v["promedio"] for v in valoradas) / len(valoradas), 2) if valoradas else None
+        )
+        por_autor[autor_id] = {
+            "promedio": promedio_autor,
+            "videosValorados": len(valoradas),
+            "totalVideos": len(lids),
+            "totalValoraciones": sum(v["total"] for v in valoradas),
+        }
+
+    return {"por_leccion": por_leccion, "por_curso": por_curso, "por_autor": por_autor}
+
+
+def _obtener_valoracion_docente(
+    db: Session,
+    usuario: Usuario,
+    cursos: Optional[list[Curso]] = None,
+) -> Optional[dict]:
+    if usuario.rol not in ROLES_STAFF:
+        return None
+    lista_cursos = cursos if cursos is not None else _cargar_cursos_completos(db)
+    val = _calcular_valoraciones(db, lista_cursos, usuario.id)
+    return val["por_autor"].get(
+        usuario.id,
+        {"promedio": None, "videosValorados": 0, "totalVideos": 0, "totalValoraciones": 0},
+    )
 
 
 def _cargar_cursos_completos(db: Session) -> list[Curso]:
@@ -188,6 +266,7 @@ def _serializar_curso_para_usuario(
     mapa_inscripciones: dict[int, InscripcionAcceso],
     mapa_lecciones: dict[int, ProgresoLeccion],
     mapa_autores: Optional[dict[int, str]] = None,
+    valoraciones: Optional[dict] = None,
 ) -> dict:
     es_staff = usuario.rol in ROLES_STAFF
     insc = mapa_inscripciones.get(curso.id)
@@ -225,6 +304,9 @@ def _serializar_curso_para_usuario(
         (mapa_autores or {}).get(curso.creado_por_id) if curso.creado_por_id else None
     )
 
+    val_curso = (valoraciones or {}).get("por_curso", {}).get(curso.id, {})
+    val_lecciones = (valoraciones or {}).get("por_leccion", {})
+
     return {
         "id": curso.id,
         "titulo": curso.titulo,
@@ -243,6 +325,9 @@ def _serializar_curso_para_usuario(
         "tieneAcceso": tiene_acceso,
         "estadoAcceso": estado_acceso,
         "prelacionCumplida": prelacion_cumplida,
+        "valoracionPromedio": val_curso.get("promedio"),
+        "totalValoraciones": val_curso.get("total", 0),
+        "videosValorados": val_curso.get("videosValorados", 0),
         "modulos": [
             {
                 "id": m.id,
@@ -255,6 +340,9 @@ def _serializar_curso_para_usuario(
                         "titulo": l.titulo,
                         "duracion": int(l.duracion or 45),
                         "video": l.video_url,
+                        "valoracionPromedio": val_lecciones.get(l.id, {}).get("promedio"),
+                        "totalValoraciones": val_lecciones.get(l.id, {}).get("total", 0),
+                        "miValoracion": val_lecciones.get(l.id, {}).get("miValoracion"),
                         "cuestionarios": [serializar_pregunta(q) for q in l.preguntas],
                     }
                     for l in m.lecciones
@@ -320,7 +408,8 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="Esta cuenta se encuentra desactivada. Contacta al administrador.")
 
     token = crear_token(usuario)
-    return {"token": token, "usuario": _serializar_usuario(usuario)}
+    val_docente = _obtener_valoracion_docente(db, usuario)
+    return {"token": token, "usuario": _serializar_usuario(usuario, val_docente)}
 
 
 @app.post("/api/auth/register", status_code=201)
@@ -364,8 +453,20 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @app.get("/api/auth/me")
-def me(usuario: Usuario = Depends(obtener_usuario_actual)):
-    return {"usuario": _serializar_usuario(usuario)}
+def me(
+    usuario: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    val_docente = _obtener_valoracion_docente(db, usuario)
+    return {"usuario": _serializar_usuario(usuario, val_docente)}
+
+
+@app.get("/api/docente/valoracion")
+def obtener_mi_valoracion_docente(
+    usuario: Usuario = Depends(requerir_profesor_o_admin),
+    db: Session = Depends(get_db),
+):
+    return _obtener_valoracion_docente(db, usuario)
 
 
 # =============================================================================
@@ -383,9 +484,10 @@ def listar_cursos(
     mapa_insc = {i.curso_id: i for i in inscripciones}
     progs = db.query(ProgresoLeccion).filter(ProgresoLeccion.usuario_id == usuario.id).all()
     mapa_lecciones = {p.leccion_id: p for p in progs}
+    valoraciones = _calcular_valoraciones(db, cursos, usuario.id)
 
     return [
-        _serializar_curso_para_usuario(c, usuario, mapa_cursos, mapa_insc, mapa_lecciones, mapa_autores)
+        _serializar_curso_para_usuario(c, usuario, mapa_cursos, mapa_insc, mapa_lecciones, mapa_autores, valoraciones)
         for c in cursos
     ]
 
@@ -461,8 +563,9 @@ def crear_curso(
     cursos = _cargar_cursos_completos(db)
     mapa_cursos = {c.id: c for c in cursos}
     mapa_autores = {u.id: u.nombre for u in db.query(Usuario).all()}
+    valoraciones = _calcular_valoraciones(db, cursos, usuario.id)
     creado = mapa_cursos[curso.id]
-    return _serializar_curso_para_usuario(creado, usuario, mapa_cursos, {}, {}, mapa_autores)
+    return _serializar_curso_para_usuario(creado, usuario, mapa_cursos, {}, {}, mapa_autores, valoraciones)
 
 
 @app.put("/api/cursos/{curso_id}")
@@ -553,7 +656,8 @@ def editar_curso(
     cursos = _cargar_cursos_completos(db)
     mapa_cursos = {c.id: c for c in cursos}
     mapa_autores = {u.id: u.nombre for u in db.query(Usuario).all()}
-    return _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}, mapa_autores)
+    valoraciones = _calcular_valoraciones(db, cursos, usuario.id)
+    return _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}, mapa_autores, valoraciones)
 
 
 @app.delete("/api/cursos/{curso_id}")
@@ -627,10 +731,11 @@ def agregar_leccion_con_video(
     cursos = _cargar_cursos_completos(db)
     mapa_cursos = {c.id: c for c in cursos}
     mapa_autores = {u.id: u.nombre for u in db.query(Usuario).all()}
+    valoraciones = _calcular_valoraciones(db, cursos, usuario.id)
     return {
         "ok": True,
         "leccionId": nueva.id,
-        "curso": _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}, mapa_autores),
+        "curso": _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}, mapa_autores, valoraciones),
     }
 
 
@@ -700,9 +805,81 @@ def actualizar_video_leccion(
     cursos = _cargar_cursos_completos(db)
     mapa_cursos = {c.id: c for c in cursos}
     mapa_autores = {u.id: u.nombre for u in db.query(Usuario).all()}
+    valoraciones = _calcular_valoraciones(db, cursos, usuario.id)
     return {
         "ok": True,
-        "curso": _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}, mapa_autores),
+        "curso": _serializar_curso_para_usuario(mapa_cursos[curso_id], usuario, mapa_cursos, {}, {}, mapa_autores, valoraciones),
+    }
+
+
+@app.post("/api/lecciones/{leccion_id}/valorar")
+def valorar_leccion(
+    leccion_id: int,
+    body: ValorarLeccionRequest,
+    usuario: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    leccion = (
+        db.query(Leccion)
+        .options(selectinload(Leccion.modulo))
+        .filter(Leccion.id == leccion_id)
+        .first()
+    )
+    if not leccion or not leccion.modulo:
+        raise HTTPException(status_code=404, detail="Lección no encontrada.")
+
+    cursos = _cargar_cursos_completos(db)
+    curso_padre = next((c for c in cursos if c.id == leccion.modulo.curso_id), None)
+    if not curso_padre:
+        raise HTTPException(status_code=404, detail="Curso no encontrado.")
+
+    _verificar_acceso_curso(db, usuario, curso_padre, cursos)
+
+    existente = (
+        db.query(ValoracionLeccion)
+        .filter(
+            ValoracionLeccion.usuario_id == usuario.id,
+            ValoracionLeccion.leccion_id == leccion_id,
+        )
+        .first()
+    )
+    if existente:
+        existente.puntuacion = body.puntuacion
+    else:
+        db.add(
+            ValoracionLeccion(
+                usuario_id=usuario.id,
+                leccion_id=leccion_id,
+                puntuacion=body.puntuacion,
+            )
+        )
+    db.commit()
+
+    valoraciones = _calcular_valoraciones(db, cursos, usuario.id)
+    val_leccion = valoraciones["por_leccion"].get(
+        leccion_id,
+        {"promedio": float(body.puntuacion), "total": 1, "miValoracion": body.puntuacion},
+    )
+    val_curso = valoraciones["por_curso"].get(
+        curso_padre.id,
+        {"promedio": float(body.puntuacion), "total": 1, "videosValorados": 1},
+    )
+
+    return {
+        "ok": True,
+        "leccionId": leccion_id,
+        "cursoId": curso_padre.id,
+        "miValoracion": body.puntuacion,
+        "leccion": {
+            "valoracionPromedio": val_leccion["promedio"],
+            "totalValoraciones": val_leccion["total"],
+            "miValoracion": val_leccion["miValoracion"],
+        },
+        "curso": {
+            "valoracionPromedio": val_curso["promedio"],
+            "totalValoraciones": val_curso["total"],
+            "videosValorados": val_curso["videosValorados"],
+        },
     }
 
 

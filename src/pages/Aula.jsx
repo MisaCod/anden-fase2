@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { useCursos } from '../contextos/CursosContext.jsx'
 import { useProgreso } from '../contextos/ProgresoContext.jsx'
 import BarraProgreso from '../components/BarraProgreso.jsx'
+import EstrellasValoracion from '../components/EstrellasValoracion.jsx'
 import ModalAccesoCurso from '../components/ModalAccesoCurso.jsx'
 import Reproductor from '../components/Reproductor.jsx'
 import TituloParada from '../components/TituloParada.jsx'
@@ -151,6 +152,15 @@ function Aula() {
               {curso.titulo} · {modulo?.titulo}
             </p>
             <h1>{leccion.titulo}</h1>
+            <div className="aula-valoracion-curso">
+              <span>Valoración del curso:</span>
+              <EstrellasValoracion
+                valor={curso.valoracionPromedio}
+                total={curso.totalValoraciones}
+                tamano="sm"
+                etiquetaVacia="Sin valoraciones"
+              />
+            </div>
           </div>
 
           <div className="aula-metricas-rapidas">

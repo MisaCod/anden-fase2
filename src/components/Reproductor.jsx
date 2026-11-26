@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Cuestionario from './Cuestionario.jsx'
+import EstrellasValoracion from './EstrellasValoracion.jsx'
+import { useCursos } from '../contextos/CursosContext.jsx'
 import { useProgreso } from '../contextos/ProgresoContext.jsx'
 import { obtenerVideoUrl } from '../logica/almacenamientoVideos.js'
 import { formatoTiempo } from '../logica/formato.js'
@@ -38,6 +40,7 @@ function leerSilenciadoInicial() {
 function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
   const { progreso, guardarAvance, responder, completarLeccion, estadisticasPorCurso, certificados } =
     useProgreso()
+  const { valorarLeccion } = useCursos()
 
   const videoRef = useRef(null)
   const reproductorRef = useRef(null)
@@ -51,6 +54,9 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
   const [respondidasEnRepaso, setRespondidasEnRepaso] = useState([])
   const [terminada, setTerminada] = useState(null) // null, 'nueva' o 'repaso'
   const [guardandoFinal, setGuardandoFinal] = useState(false)
+  const [valoracionActual, setValoracionActual] = useState(leccion.miValoracion || 0)
+  const [guardandoValoracion, setGuardandoValoracion] = useState(false)
+  const [errorValoracion, setErrorValoracion] = useState('')
   const [reanudado, setReanudado] = useState(0)
   const [pantallaCompleta, setPantallaCompleta] = useState(false)
   const [volumen, setVolumen] = useState(leerVolumenInicial)
@@ -416,6 +422,41 @@ function Reproductor({ curso, leccion, siguiente, modoRepaso = false }) {
                   Aciertos del curso: <strong>{statsCurso.porcentajeAciertos}%</strong> (mínimo para certificado: {statsCurso.umbralCertificado}%)
                 </p>
               )}
+              <div className="valoracion-final">
+                <p className="valoracion-final-etiqueta">
+                  {valoracionActual ? 'Tu valoración de este video' : 'Valora este video'}
+                </p>
+                <EstrellasValoracion
+                  valor={valoracionActual}
+                  interactiva={!guardandoValoracion}
+                  cargando={guardandoValoracion}
+                  mostrarTexto={false}
+                  tamano="md"
+                  alValorar={async (puntuacion) => {
+                    setErrorValoracion('')
+                    setGuardandoValoracion(true)
+                    const res = await valorarLeccion(leccion.id, puntuacion)
+                    setGuardandoValoracion(false)
+                    if (res.ok) {
+                      setValoracionActual(puntuacion)
+                    } else {
+                      setErrorValoracion(res.error || 'No se pudo guardar tu valoración.')
+                    }
+                  }}
+                />
+                <span className="valoracion-final-estado">
+                  {guardandoValoracion
+                    ? 'Guardando valoración…'
+                    : valoracionActual
+                      ? `${valoracionActual} de 5${
+                          leccion.valoracionPromedio != null
+                            ? ` · Promedio del video: ${Number(leccion.valoracionPromedio).toFixed(1)} / 5 (${leccion.totalValoraciones})`
+                            : ''
+                        }`
+                      : 'Haz clic en una estrella para valorar'}
+                </span>
+                {errorValoracion && <span className="valoracion-final-error">{errorValoracion}</span>}
+              </div>
               <div className="botones">
                 {guardandoFinal ? (
                   <button type="button" className="boton" disabled>

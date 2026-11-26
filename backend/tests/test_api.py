@@ -422,3 +422,113 @@ def test_duracion_real_automatica_no_trunca_progreso(client: TestClient):
 
     # Limpieza
     assert client.delete(f"/api/cursos/{cid}", headers=h_profe).status_code == 200
+
+
+def test_sistema_valoracion_videos_cursos_y_profesor(client: TestClient):
+    h_profe = _auth_headers(client, "profe")
+    h_diego = _auth_headers(client, "diego")
+    h_camila = _auth_headers(client, "camila_test", "clave123")
+
+    # Profe crea un curso propio con 2 videos (lecciones) y otro curso con 1 video
+    r_c1 = client.post(
+        "/api/cursos",
+        headers=h_profe,
+        json={
+            "titulo": "Curso Valoración A",
+            "categoria": "Diseño",
+            "nivel": "Principiante",
+            "descripcion": "Curso de prueba para valoraciones.",
+            "color": "#2f6f73",
+            "tipoAcceso": "gratis",
+            "precio": 0,
+            "umbralCertificado": 70,
+            "modulos": [
+                {
+                    "titulo": "Módulo 1",
+                    "lecciones": [
+                        {"titulo": "Video 1", "duracion": 60, "video": "/videos/101.mp4", "cuestionarios": []},
+                        {"titulo": "Video 2", "duracion": 60, "video": "/videos/102.mp4", "cuestionarios": []},
+                    ],
+                }
+            ],
+        },
+    )
+    assert r_c1.status_code == 201, r_c1.text
+    c1 = r_c1.json()
+    vid1 = c1["modulos"][0]["lecciones"][0]["id"]
+    vid2 = c1["modulos"][0]["lecciones"][1]["id"]
+
+    r_c2 = client.post(
+        "/api/cursos",
+        headers=h_profe,
+        json={
+            "titulo": "Curso Valoración B",
+            "categoria": "Datos",
+            "nivel": "Intermedio",
+            "descripcion": "Segundo curso para validar promedio docente.",
+            "color": "#e59b34",
+            "tipoAcceso": "gratis",
+            "precio": 0,
+            "umbralCertificado": 70,
+            "modulos": [
+                {
+                    "titulo": "Módulo 1",
+                    "lecciones": [
+                        {"titulo": "Video 3", "duracion": 60, "video": "/videos/101.mp4", "cuestionarios": []},
+                    ],
+                }
+            ],
+        },
+    )
+    assert r_c2.status_code == 201, r_c2.text
+    c2 = r_c2.json()
+    vid3 = c2["modulos"][0]["lecciones"][0]["id"]
+
+    # Validación de rango 1..5
+    assert client.post(f"/api/lecciones/{vid1}/valorar", headers=h_diego, json={"puntuacion": 0}).status_code == 422
+    assert client.post(f"/api/lecciones/{vid1}/valorar", headers=h_diego, json={"puntuacion": 6}).status_code == 422
+
+    # Diego y Camila valoran vid1: promedio vid1 = (5 + 3) / 2 = 4.0
+    r_v1_d = client.post(f"/api/lecciones/{vid1}/valorar", headers=h_diego, json={"puntuacion": 5})
+    assert r_v1_d.status_code == 200
+    assert r_v1_d.json()["leccion"]["miValoracion"] == 5
+
+    r_v1_c = client.post(f"/api/lecciones/{vid1}/valorar", headers=h_camila, json={"puntuacion": 3})
+    assert r_v1_c.status_code == 200
+    assert r_v1_c.json()["leccion"]["valoracionPromedio"] == 4.0
+    assert r_v1_c.json()["leccion"]["totalValoraciones"] == 2
+
+    # Diego actualiza su valoración de vid1 de 5 a 5 (sin duplicar registro) y valora vid2 con 2 y vid3 con 3
+    r_upd = client.post(f"/api/lecciones/{vid1}/valorar", headers=h_diego, json={"puntuacion": 5})
+    assert r_upd.json()["leccion"]["totalValoraciones"] == 2
+
+    client.post(f"/api/lecciones/{vid2}/valorar", headers=h_diego, json={"puntuacion": 2})
+    client.post(f"/api/lecciones/{vid3}/valorar", headers=h_camila, json={"puntuacion": 3})
+
+    # Ver valoración individual de cada curso en /api/cursos:
+    # c1 tiene vid1=4.0 y vid2=2.0 -> promedio curso = (4.0 + 2.0) / 2 = 3.0
+    # c2 tiene vid3=3.0 -> promedio curso = 3.0
+    cursos_diego = client.get("/api/cursos", headers=h_diego).json()
+    curso_1 = next(c for c in cursos_diego if c["id"] == c1["id"])
+    curso_2 = next(c for c in cursos_diego if c["id"] == c2["id"])
+    assert curso_1["valoracionPromedio"] == 3.0
+    assert curso_1["totalValoraciones"] == 3
+    assert curso_2["valoracionPromedio"] == 3.0
+    assert curso_2["totalValoraciones"] == 1
+
+    # Verificar promedio del profesor calculado con el promedio de todos sus videos valorados:
+    # vid1=4.0, vid2=2.0, vid3=3.0 -> promedio = (4.0 + 2.0 + 3.0) / 3 = 3.0
+    r_doc = client.get("/api/docente/valoracion", headers=h_profe)
+    assert r_doc.status_code == 200
+    doc = r_doc.json()
+    assert doc["promedio"] == 3.0
+    assert doc["videosValorados"] == 3
+    assert doc["totalValoraciones"] == 4
+
+    # /api/auth/me del profesor también incluye valoracionDocente
+    me_profe = client.get("/api/auth/me", headers=h_profe).json()
+    assert me_profe["usuario"]["valoracionDocente"]["promedio"] == 3.0
+
+    # Limpieza
+    assert client.delete(f"/api/cursos/{c1['id']}", headers=h_profe).status_code == 200
+    assert client.delete(f"/api/cursos/{c2['id']}", headers=h_profe).status_code == 200

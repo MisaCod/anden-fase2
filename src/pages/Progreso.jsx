@@ -1,17 +1,34 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import BarraProgreso from '../components/BarraProgreso.jsx'
 import { useAuth } from '../contextos/AuthContext.jsx'
 import { useCursos } from '../contextos/CursosContext.jsx'
 import { useProgreso } from '../contextos/ProgresoContext.jsx'
 import { XP_POR_NIVEL } from '../logica/gamificacion.js'
+import { apiFetch } from '../servicios/api.js'
 
 function Progreso() {
-  const { usuarioActual } = useAuth()
+  const { usuarioActual, esStaff } = useAuth()
   const { cursos } = useCursos()
   const { resumen, estadisticasPorCurso, habilidades, logros, certificados, reiniciar } = useProgreso()
   const [confirmandoReinicio, setConfirmandoReinicio] = useState(false)
   const [reiniciando, setReiniciando] = useState(false)
+  const [valoracionDocente, setValoracionDocente] = useState(
+    () => usuarioActual?.valoracionDocente || null
+  )
+
+  useEffect(() => {
+    if (!esStaff) return
+    let activo = true
+    apiFetch('/api/docente/valoracion')
+      .then((res) => {
+        if (activo && res) setValoracionDocente(res)
+      })
+      .catch(() => {})
+    return () => {
+      activo = false
+    }
+  }, [esStaff, cursos])
 
   const estadisticas = [
     { titulo: 'días seguidos estudiando', valor: resumen.diasSeguidos },
@@ -19,6 +36,17 @@ function Progreso() {
     { titulo: 'preguntas acertadas', valor: resumen.preguntasAcertadas },
     { titulo: 'aciertos promedio', valor: `${resumen.porcentajeAciertosGlobal}%` },
     { titulo: 'minutos de estudio', valor: resumen.minutos },
+    ...(esStaff
+      ? [
+          {
+            titulo: 'promedio docente (videos)',
+            valor:
+              valoracionDocente?.promedio != null
+                ? `${Number(valoracionDocente.promedio).toFixed(1)} / 5`
+                : 'Sin datos',
+          },
+        ]
+      : []),
   ]
 
   const logrosRecientes = logros.filter((logro) => logro.desbloqueado).slice(0, 3)

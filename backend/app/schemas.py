@@ -123,3 +123,7 @@ class OtorgarAccesoManualRequest(BaseModel):
     usuarioId: int
     cursoId: int
     estado: str = Field(default="aprobado", pattern="^(aprobado|rechazado)$")
+
+
+class ValorarLeccionRequest(BaseModel):
+    puntuacion: int = Field(..., ge=1, le=5)

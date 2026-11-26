@@ -135,6 +135,42 @@ export function CursosProvider({ children }) {
     }
   }
 
+  async function valorarLeccion(leccionId, puntuacion) {
+    try {
+      const res = await apiFetch(`/api/lecciones/${leccionId}/valorar`, {
+        method: 'POST',
+        body: JSON.stringify({ puntuacion }),
+      })
+      setCursos((prev) =>
+        prev.map((c) => {
+          if (c.id !== res.cursoId) return c
+          return {
+            ...c,
+            valoracionPromedio: res.curso?.valoracionPromedio ?? c.valoracionPromedio,
+            totalValoraciones: res.curso?.totalValoraciones ?? c.totalValoraciones,
+            videosValorados: res.curso?.videosValorados ?? c.videosValorados,
+            modulos: c.modulos.map((m) => ({
+              ...m,
+              lecciones: m.lecciones.map((l) =>
+                l.id === leccionId
+                  ? {
+                      ...l,
+                      valoracionPromedio: res.leccion?.valoracionPromedio ?? l.valoracionPromedio,
+                      totalValoraciones: res.leccion?.totalValoraciones ?? l.totalValoraciones,
+                      miValoracion: res.leccion?.miValoracion ?? puntuacion,
+                    }
+                  : l
+              ),
+            })),
+          }
+        })
+      )
+      return { ok: true, ...res }
+    } catch (err) {
+      return { ok: false, error: err.message || 'No se pudo guardar la valoración.' }
+    }
+  }
+
   return (
     <CursosContext.Provider
       value={{
@@ -149,6 +185,7 @@ export function CursosProvider({ children }) {
         agregarLeccionConVideo,
         solicitarAccesoCurso,
         pagarCursoSimulado,
+        valorarLeccion,
       }}
     >
       {children}

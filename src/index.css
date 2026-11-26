@@ -3662,3 +3662,126 @@ a.parada-titulo:hover {
   color: var(--gris);
   border: 1px solid var(--via);
 }
+
+/* ===== Sistema de valoración de videos, cursos y perfil docente ===== */
+.valoracion-estrellas {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: middle;
+}
+
+.valoracion-estrellas-fila {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.estrella-svg.llena {
+  color: #b47b1e;
+}
+
+.estrella-svg.vacia {
+  color: #b5b2a8;
+}
+
+.estrella-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.estrella-boton:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.estrella-boton:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.valoracion-texto {
+  font-size: 13px;
+  color: var(--tinta);
+}
+
+.curso-valoracion-linea {
+  margin-top: 6px;
+}
+
+.aula-valoracion-curso {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--gris);
+}
+
+.valoracion-final {
+  margin: 6px 0 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.valoracion-final-etiqueta {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+}
+
+.capa-final .estrella-svg.llena {
+  color: #f4b942;
+}
+
+.capa-final .estrella-svg.vacia {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.valoracion-final-estado {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.valoracion-final-error {
+  font-size: 13px;
+  color: #ffb4a9;
+}
+
+.admin-perfil-resumen {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.admin-perfil-tarjeta {
+  background: var(--superficie);
+  border: 1px solid var(--via);
+  border-radius: 10px;
+  padding: 12px 16px;
+  min-width: 260px;
+}
+
+.admin-perfil-titulo {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tinta);
+  margin-bottom: 6px;
+}
+
+.admin-perfil-valoracion {
+  margin-bottom: 4px;
+}
+
+.admin-perfil-detalle {
+  font-size: 12px;
+}

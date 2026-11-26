@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import BarraProgreso from '../components/BarraProgreso.jsx'
+import EstrellasValoracion from '../components/EstrellasValoracion.jsx'
 import TimelineCheckpoints from '../components/TimelineCheckpoints.jsx'
 import { useAuth } from '../contextos/AuthContext.jsx'
 import { useCursos } from '../contextos/CursosContext.jsx'
@@ -127,6 +128,21 @@ function Admin() {
 
   // Pestañas: 'cursos' | 'videos' | 'solicitudes' | 'usuarios'
   const [pestanaActiva, setPestanaActiva] = useState('cursos')
+  const [valoracionDocente, setValoracionDocente] = useState(
+    () => usuarioActual?.valoracionDocente || null
+  )
+
+  useEffect(() => {
+    let activo = true
+    apiFetch('/api/docente/valoracion')
+      .then((res) => {
+        if (activo && res) setValoracionDocente(res)
+      })
+      .catch(() => {})
+    return () => {
+      activo = false
+    }
+  }, [cursos])
 
   // ==================== CURSOS ====================
   const [cursoEditandoId, setCursoEditandoId] = useState(null)
@@ -800,11 +816,31 @@ function Admin() {
       </header>
 
       <main className="admin-contenedor">
-        <div className="admin-encabezado-pagina">
-          <h1>{esAdminGeneral ? 'Panel de Administración General' : 'Panel de Profesor'}</h1>
-          <p className="texto-suave">
-            Gestiona cursos, prelaciones, videos con checkpoints interactivos en la línea de tiempo y permisos de acceso.
-          </p>
+        <div className="admin-encabezado-pagina admin-perfil-resumen">
+          <div>
+            <h1>{esAdminGeneral ? 'Panel de Administración General' : 'Panel de Profesor'}</h1>
+            <p className="texto-suave">
+              Gestiona cursos, prelaciones, videos con checkpoints interactivos en la línea de tiempo y permisos de acceso.
+            </p>
+          </div>
+
+          <div className="admin-perfil-tarjeta">
+            <p className="admin-perfil-titulo">Perfil docente: {usuarioActual?.nombre}</p>
+            <div className="admin-perfil-valoracion">
+              <EstrellasValoracion
+                valor={valoracionDocente?.promedio ?? null}
+                tamano="sm"
+                etiquetaVacia="Sin videos valorados"
+              />
+            </div>
+            <p className="texto-suave admin-perfil-detalle">
+              Promedio calculado sobre {valoracionDocente?.videosValorados || 0} de{' '}
+              {valoracionDocente?.totalVideos || 0} videos
+              {valoracionDocente?.totalValoraciones
+                ? ` (${valoracionDocente.totalValoraciones} valoraciones)`
+                : ''}
+            </p>
+          </div>
         </div>
 
         <div className="admin-tabs" role="tablist">
@@ -1153,6 +1189,10 @@ function Admin() {
                           {c.categoria} · {leccionesDe(c).length} lecciones · Cert. ≥ {c.umbralCertificado}%
                           {c.prerequisitoTitulo ? ` · Requiere: ${c.prerequisitoTitulo}` : ''}
                           {c.creadoPorNombre ? ` · Autor: ${c.creadoPorNombre}` : ''}
+                          {' · '}
+                          {c.valoracionPromedio != null
+                            ? `Valoración: ${Number(c.valoracionPromedio).toFixed(1)} / 5 (${c.totalValoraciones})`
+                            : 'Sin valoraciones'}
                         </p>
                       </div>
 

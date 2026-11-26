@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import BarraProgreso from './BarraProgreso.jsx'
+import EstrellasValoracion from './EstrellasValoracion.jsx'
 import { useProgreso } from '../contextos/ProgresoContext.jsx'
 import { cursoEmpezado, cursoTerminado, leccionesDe, porcentajeCurso } from '../logica/progreso.js'
 
@@ -61,6 +62,14 @@ function FilaCurso({ curso, alSolicitarAcceso }) {
             <> · <strong>{stats.porcentajeAciertos}% aciertos</strong></>
           )}
         </p>
+        <div className="curso-valoracion-linea">
+          <EstrellasValoracion
+            valor={curso.valoracionPromedio}
+            total={curso.totalValoraciones}
+            tamano="sm"
+            etiquetaVacia="Sin valoraciones"
+          />
+        </div>
       </div>
 
       <div className="fila-curso-progreso">

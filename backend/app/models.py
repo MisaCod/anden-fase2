@@ -95,6 +95,11 @@ class Leccion(Base):
         cascade="all, delete-orphan",
         order_by="Pregunta.segundo, Pregunta.id",
     )
+    valoraciones = relationship(
+        "ValoracionLeccion",
+        back_populates="leccion",
+        cascade="all, delete-orphan",
+    )
 
 
 class Pregunta(Base):
@@ -201,3 +206,16 @@ class Certificado(Base):
     curso_id = Column(Integer, ForeignKey("cursos.id", ondelete="CASCADE"), nullable=False, index=True)
     porcentaje_aciertos = Column(Integer, nullable=False)
     emitido_en = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ValoracionLeccion(Base):
+    __tablename__ = "valoraciones_leccion"
+    __table_args__ = (UniqueConstraint("usuario_id", "leccion_id", name="uq_valoracion_usuario_leccion"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    leccion_id = Column(Integer, ForeignKey("lecciones.id", ondelete="CASCADE"), nullable=False, index=True)
+    puntuacion = Column(Integer, nullable=False)
+    actualizado_en = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    leccion = relationship("Leccion", back_populates="valoraciones")
